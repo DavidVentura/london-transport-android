@@ -42,7 +42,7 @@ sealed interface MarkerStyle {
 
   data object Pin : MarkerStyle
 
-  data class Stop(val line: LineId) : MarkerStyle
+  data class Stop(val line: LineId, val kind: TransportKind) : MarkerStyle
 }
 
 /**

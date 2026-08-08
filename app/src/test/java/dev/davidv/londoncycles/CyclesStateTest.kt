@@ -11,6 +11,7 @@ import dev.davidv.londoncycles.domain.PinId
 import dev.davidv.londoncycles.layers.CYCLE_HIRE_LAYER
 import dev.davidv.londoncycles.layers.pinFeature
 import dev.davidv.londoncycles.layers.pinIdOf
+import dev.davidv.londoncycles.domain.BikeDisplay
 import dev.davidv.londoncycles.ui.CyclesState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -41,10 +42,24 @@ private fun state(vararg starred: String) =
 
 class CyclesStateTest {
   @Test
-  fun `the favourites filter keeps hand-placed pins on the map`() {
-    val filtered = state("Bravo").copy(favouritesOnly = true)
+  fun `the favourites setting keeps hand-placed pins on the map`() {
+    val filtered = state("Bravo").copy(bikeDisplay = BikeDisplay.FAVOURITES)
 
     assertEquals(listOf("Bravo", "Home"), filtered.visibleFeatures.map { it.title })
+  }
+
+  @Test
+  fun `switching docking stations off leaves the pins`() {
+    val off = state("Bravo").copy(bikeDisplay = BikeDisplay.NONE)
+
+    assertEquals(listOf("Home"), off.visibleFeatures.map { it.title })
+  }
+
+  @Test
+  fun `the bike button cycles off, favourites, all`() {
+    assertEquals(BikeDisplay.FAVOURITES, BikeDisplay.NONE.next())
+    assertEquals(BikeDisplay.ALL, BikeDisplay.FAVOURITES.next())
+    assertEquals(BikeDisplay.NONE, BikeDisplay.ALL.next())
   }
 
   @Test

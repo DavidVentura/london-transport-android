@@ -5,12 +5,14 @@ import androidx.lifecycle.viewModelScope
 import dev.davidv.londoncycles.data.FavouritesStore
 import dev.davidv.londoncycles.data.PinsStore
 import dev.davidv.londoncycles.data.SettingsStore
+import dev.davidv.londoncycles.domain.BikeDisplay
 import dev.davidv.londoncycles.domain.FeatureKey
 import dev.davidv.londoncycles.domain.GeoBounds
 import dev.davidv.londoncycles.domain.LatLon
 import dev.davidv.londoncycles.domain.boundsAround
 import dev.davidv.londoncycles.domain.MapCamera
 import dev.davidv.londoncycles.domain.MapFeature
+import dev.davidv.londoncycles.domain.TransportKind
 import dev.davidv.londoncycles.layers.LayerLoad
 import dev.davidv.londoncycles.layers.MapLayer
 import dev.davidv.londoncycles.layers.pinFeature
@@ -29,7 +31,8 @@ data class CyclesState(
   val layerFeatures: List<MapFeature> = emptyList(),
   val pinFeatures: List<MapFeature> = emptyList(),
   val favourites: Set<FeatureKey> = emptySet(),
-  val favouritesOnly: Boolean = false,
+  val bikeDisplay: BikeDisplay = BikeDisplay.ALL,
+  val hiddenKinds: Set<TransportKind> = emptySet(),
   val refreshing: Boolean = false,
   val offline: Boolean = false,
   val error: String? = null,
@@ -39,11 +42,16 @@ data class CyclesState(
   val fitBounds: GeoBounds? = null,
   val pendingPin: LatLon? = null,
 ) {
-  /** Hand-placed pins stay on the map through the favourites filter; they are already deliberate. */
+  fun shows(kind: TransportKind): Boolean = kind !in hiddenKinds
+
+  /** Hand-placed pins stay on the map through every filter; they are already deliberate. */
   val visibleFeatures: List<MapFeature>
     get() =
-      if (favouritesOnly) layerFeatures.filter { it.key in favourites } + pinFeatures
-      else layerFeatures + pinFeatures
+      when (bikeDisplay) {
+        BikeDisplay.NONE -> pinFeatures
+        BikeDisplay.FAVOURITES -> layerFeatures.filter { it.key in favourites } + pinFeatures
+        BikeDisplay.ALL -> layerFeatures + pinFeatures
+      }
 
   val favouriteFeatures: List<MapFeature>
     get() = layerFeatures.filter { it.key in favourites }.sortedBy { it.title }
@@ -84,7 +92,10 @@ class CyclesViewModel(
       }
     }
     viewModelScope.launch {
-      settings.favouritesOnly.collect { only -> _state.update { it.copy(favouritesOnly = only) } }
+      settings.bikeDisplay.collect { display -> _state.update { it.copy(bikeDisplay = display) } }
+    }
+    viewModelScope.launch {
+      settings.hiddenKinds.collect { hidden -> _state.update { it.copy(hiddenKinds = hidden) } }
     }
     viewModelScope.launch { fitToSavedPlaces() }
     refresh()
@@ -156,9 +167,14 @@ class CyclesViewModel(
   }
 
   /** Written to disk and read back through the flow above, so there is one copy of the answer. */
-  fun toggleFavouritesOnly() {
-    val wanted = !_state.value.favouritesOnly
-    viewModelScope.launch { settings.setFavouritesOnly(wanted) }
+  fun toggleKind(kind: TransportKind) {
+    val wanted = kind in _state.value.hiddenKinds
+    viewModelScope.launch { settings.setKindVisible(kind, wanted) }
+  }
+
+  fun cycleBikeDisplay() {
+    val wanted = _state.value.bikeDisplay.next()
+    viewModelScope.launch { settings.setBikeDisplay(wanted) }
   }
 
   fun focusOn(feature: MapFeature) {

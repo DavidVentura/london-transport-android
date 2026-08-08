@@ -8,6 +8,7 @@ import dev.davidv.londoncycles.domain.RouteStop
 import dev.davidv.londoncycles.domain.StopId
 import java.io.File
 import java.io.IOException
+import java.time.Instant
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerializationException
@@ -19,6 +20,8 @@ private data class CachedRoute(
   val line: String,
   val direction: String,
   val towards: String,
+  // Absent in caches written before routes had an age; those read as long stale, so they refetch.
+  val fetchedAt: Long = 0,
   val segments: List<List<List<Double>>>,
   // Absent in caches written before stops were kept; those fill in on the next fetch.
   val stops: List<CachedStop> = emptyList(),
@@ -33,8 +36,11 @@ private data class CachedStop(
   val letter: String? = null,
 )
 
+/** A route as last seen, with when that was — a line only needs asking about a few times a day. */
+data class HeldRoute(val path: RoutePath, val fetchedAt: Instant)
+
 sealed interface RouteCacheRead {
-  data class Held(val routes: List<RoutePath>) : RouteCacheRead
+  data class Held(val routes: List<HeldRoute>) : RouteCacheRead
 
   data object Empty : RouteCacheRead
 
@@ -57,15 +63,19 @@ class RouteCache(private val file: File) {
 
   suspend fun read(): RouteCacheRead = withContext(Dispatchers.IO) { readBlocking() }
 
-  suspend fun put(path: RoutePath): RouteChange =
+  suspend fun put(path: RoutePath, at: Instant): RouteChange =
     withContext(Dispatchers.IO) {
       val held = (readBlocking() as? RouteCacheRead.Held)?.routes.orEmpty()
-      val previous = held.firstOrNull { it.line == path.line && it.direction == path.direction }
-      write(held.filterNot { it.line == path.line && it.direction == path.direction } + path)
+      val previous =
+        held.firstOrNull { it.path.line == path.line && it.path.direction == path.direction }
+      write(
+        held.filterNot { it.path.line == path.line && it.path.direction == path.direction } +
+          HeldRoute(path, at)
+      )
 
       when {
         previous == null -> RouteChange.FIRST_SEEN
-        previous.segments == path.segments -> RouteChange.UNCHANGED
+        previous.path.segments == path.segments -> RouteChange.UNCHANGED
         else -> RouteChange.MOVED
       }
     }
@@ -73,14 +83,14 @@ class RouteCache(private val file: File) {
   suspend fun forget(line: LineId) {
     withContext(Dispatchers.IO) {
       val held = (readBlocking() as? RouteCacheRead.Held)?.routes.orEmpty()
-      write(held.filterNot { it.line == line })
+      write(held.filterNot { it.path.line == line })
     }
   }
 
   private fun readBlocking(): RouteCacheRead {
     if (!file.exists()) return RouteCacheRead.Empty
     return try {
-      RouteCacheRead.Held(json.decodeFromString<List<CachedRoute>>(file.readText()).map(::toPath))
+      RouteCacheRead.Held(json.decodeFromString<List<CachedRoute>>(file.readText()).map(::toHeld))
     } catch (e: SerializationException) {
       RouteCacheRead.Unreadable(e.message ?: "corrupt route cache")
     } catch (e: IllegalArgumentException) {
@@ -90,11 +100,14 @@ class RouteCache(private val file: File) {
     }
   }
 
-  private fun write(routes: List<RoutePath>) {
+  private fun write(routes: List<HeldRoute>) {
     val scratch = File(file.parentFile, "${file.name}.writing")
     scratch.writeText(json.encodeToString(routes.map(::toCached)))
     scratch.renameTo(file)
   }
+
+  private fun toHeld(cached: CachedRoute) =
+    HeldRoute(path = toPath(cached), fetchedAt = Instant.ofEpochMilli(cached.fetchedAt))
 
   private fun toPath(cached: CachedRoute) =
     RoutePath(
@@ -119,11 +132,13 @@ class RouteCache(private val file: File) {
         },
     )
 
-  private fun toCached(path: RoutePath) =
-    CachedRoute(
+  private fun toCached(held: HeldRoute): CachedRoute {
+    val path = held.path
+    return CachedRoute(
       line = path.line.value,
       direction = path.direction.name,
       towards = path.towards,
+      fetchedAt = held.fetchedAt.toEpochMilli(),
       segments = path.segments.map { segment -> segment.map { listOf(it.latitude, it.longitude) } },
       stops =
         path.stops.map {
@@ -136,4 +151,5 @@ class RouteCache(private val file: File) {
           )
         },
     )
+  }
 }

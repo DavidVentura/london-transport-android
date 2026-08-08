@@ -5,18 +5,22 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.davidv.londoncycles.data.LinesResult
 import dev.davidv.londoncycles.data.RouteCache
+import dev.davidv.londoncycles.data.HeldRoute
 import dev.davidv.londoncycles.data.RouteCacheRead
 import dev.davidv.londoncycles.data.RouteChange
 import dev.davidv.londoncycles.data.RouteResult
 import dev.davidv.londoncycles.data.SavedLinesStore
 import dev.davidv.londoncycles.data.TflLineClient
-import dev.davidv.londoncycles.domain.BusLine
+import dev.davidv.londoncycles.domain.TransitLine
+import dev.davidv.londoncycles.domain.TransportKind
 import dev.davidv.londoncycles.domain.LineId
 import dev.davidv.londoncycles.domain.MapFeature
 import dev.davidv.londoncycles.domain.RouteDirection
 import dev.davidv.londoncycles.domain.RoutePath
 import dev.davidv.londoncycles.domain.SavedLine
 import dev.davidv.londoncycles.layers.busStopFeature
+import java.time.Duration
+import java.time.Instant
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -35,23 +39,23 @@ data class SavedRoute(
 
 data class RoutesState(
   val routes: List<SavedRoute> = emptyList(),
-  val catalogue: List<BusLine> = emptyList(),
+  val catalogue: List<TransitLine> = emptyList(),
   val loadingCatalogue: Boolean = false,
   val error: String? = null,
 ) {
-  private val shown: List<SavedRoute>
-    get() = routes.filter { it.saved.visible }
+  private fun shown(kinds: Set<TransportKind>): List<SavedRoute> =
+    routes.filter { it.saved.visible && it.saved.kind in kinds }
 
-  val drawable: List<RoutePath>
-    get() = shown.mapNotNull { it.path }
+  fun drawable(kinds: Set<TransportKind>): List<SavedRoute> = shown(kinds)
 
   /** Every stop of every drawn route, as map features the same overlay can hit-test. */
-  val stopFeatures: List<MapFeature>
-    get() =
-      shown.flatMap { route ->
-        val path = route.path ?: return@flatMap emptyList()
-        path.stops.map { busStopFeature(it, path, route.line.value) }
+  fun stopFeatures(kinds: Set<TransportKind>): List<MapFeature> =
+    shown(kinds).flatMap { route ->
+      val path = route.path ?: return@flatMap emptyList()
+      path.stops.map {
+        busStopFeature(it, path, lineLabel(route.line, route.saved.kind), route.saved.kind)
       }
+    }
 }
 
 class RoutesViewModel(
@@ -63,11 +67,19 @@ class RoutesViewModel(
   private val _state = MutableStateFlow(RoutesState())
   val state: StateFlow<RoutesState> = _state.asStateFlow()
 
-  /** Hiding a line re-emits the saved list; TfL should not be asked again for what we hold. */
-  private val alreadyFetched = mutableSetOf<Pair<LineId, RouteDirection>>()
+  private var savedLines: List<SavedLine> = emptyList()
 
   init {
-    viewModelScope.launch { saved.lines.collect { lines -> refresh(lines) } }
+    viewModelScope.launch {
+      saved.lines.collect { lines ->
+        savedLines = lines
+        refresh(lines, Refresh.IF_STALE)
+      }
+    }
+  }
+
+  fun refreshNow() {
+    viewModelScope.launch { refresh(savedLines, Refresh.FORCED) }
   }
 
   fun setDirection(line: LineId, direction: RouteDirection) {
@@ -78,12 +90,11 @@ class RoutesViewModel(
     viewModelScope.launch { saved.setVisible(line, visible) }
   }
 
-  fun save(line: LineId) {
-    viewModelScope.launch { saved.add(line, RouteDirection.INBOUND) }
+  fun save(line: TransitLine) {
+    viewModelScope.launch { saved.add(line.id, line.kind, RouteDirection.INBOUND) }
   }
 
   fun forget(line: LineId) {
-    alreadyFetched.removeAll { it.first == line }
     viewModelScope.launch {
       saved.remove(line)
       cache.forget(line)
@@ -94,7 +105,7 @@ class RoutesViewModel(
     if (_state.value.catalogue.isNotEmpty() || _state.value.loadingCatalogue) return
     _state.update { it.copy(loadingCatalogue = true) }
     viewModelScope.launch {
-      val result = client.busLines()
+      val result = client.lines()
       _state.update { current ->
         when (result) {
           is LinesResult.Success ->
@@ -108,8 +119,12 @@ class RoutesViewModel(
     }
   }
 
-  /** Draws from disk first, then replaces each route with whatever TfL says today. */
-  private suspend fun refresh(lines: List<SavedLine>) {
+  /**
+   * Draws from disk first, then replaces each route with whatever TfL says today. A route is a
+   * timetable rather than a live count, so asking a few times a day is plenty — and hiding a line
+   * re-emits the saved list, which should not cost a request at all.
+   */
+  private suspend fun refresh(lines: List<SavedLine>, refresh: Refresh) {
     if (lines.isEmpty()) {
       _state.update { it.copy(routes = emptyList()) }
       return
@@ -132,8 +147,7 @@ class RoutesViewModel(
             val carried = previous[line.id]?.takeIf { it.saved.direction == line.direction }
             SavedRoute(
               saved = line,
-              path =
-                held.firstOrNull { it.line == line.id && it.direction == line.direction },
+              path = held.firstOrNull { it.matches(line) }?.path,
               moved = carried?.moved == true,
               unavailable = carried?.unavailable,
             )
@@ -141,19 +155,22 @@ class RoutesViewModel(
       )
     }
 
+    val now = Instant.now()
     for (line in lines) {
-      if (line.id to line.direction in alreadyFetched) continue
+      val age = held.firstOrNull { it.matches(line) }?.let { Duration.between(it.fetchedAt, now) }
+      if (refresh == Refresh.IF_STALE && age != null && age < MAX_AGE) continue
       val fetched =
         when (val result = client.route(line.id, line.direction)) {
           is RouteResult.Success -> {
-            val change = cache.put(result.path)
-            alreadyFetched += line.id to line.direction
+            val change = cache.put(result.path, Instant.now())
             _state.update { it.copy(error = null) }
             SavedRoute(line, result.path, change == RouteChange.MOVED, null)
           }
           RouteResult.NotServed -> {
-            alreadyFetched += line.id to line.direction
-            SavedRoute(line, null, false, "Does not run this way")
+            val why =
+              if (line.kind == TransportKind.TUBE) "Unavailable — TfL publishes no route"
+              else "Does not run this way"
+            SavedRoute(line, null, false, why)
           }
           is RouteResult.Unreachable -> {
             _state.update { it.copy(error = "Offline — routes as last seen (${result.reason})") }
@@ -171,15 +188,27 @@ class RoutesViewModel(
     }
   }
 
+  private enum class Refresh {
+    IF_STALE,
+    FORCED,
+  }
+
   private companion object {
     const val TAG = "RoutesViewModel"
 
+    /** A published route barely moves; the docking station counts are what need chasing. */
+    val MAX_AGE: Duration = Duration.ofHours(4)
+
     /** "5" before "43" before "N5" before "X68", the way a Londoner reads a route list. */
     val BY_NUMBER =
-      compareBy<BusLine>(
+      compareBy<TransitLine>(
+        { if (it.kind == TransportKind.TUBE) 0 else 1 },
         { it.name.takeWhile { c -> !c.isDigit() } },
         { it.name.dropWhile { c -> !c.isDigit() }.takeWhile { c -> c.isDigit() }.toIntOrNull() ?: 0 },
         { it.name },
       )
   }
 }
+
+private fun HeldRoute.matches(line: SavedLine): Boolean =
+  path.line == line.id && path.direction == line.direction

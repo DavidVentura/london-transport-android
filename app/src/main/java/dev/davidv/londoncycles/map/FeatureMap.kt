@@ -71,7 +71,7 @@ fun FeatureMap(
     FeatureOverlay(
       density = density,
       colourOf = { level -> availabilityColour(level).toArgb() },
-      lineColourOf = { line -> routeColour(line).toArgb() },
+      lineColourOf = { line, kind -> routeColour(line, kind).toArgb() },
       onSelect = { feature -> currentOnSelect(feature) },
       onPlacePin = { position -> currentOnPlacePin(position) },
     )
@@ -110,7 +110,12 @@ fun FeatureMap(
   }
 
   val locationOverlay = remember {
-    MyLocationNewOverlay(GpsMyLocationProvider(context), mapView)
+    MyLocationNewOverlay(GpsMyLocationProvider(context), mapView).apply {
+      setPersonIcon(personMarker(density))
+      setDirectionIcon(directionMarker(density))
+      setPersonAnchor(0.5f, 0.5f)
+      setDirectionAnchor(0.5f, 0.5f)
+    }
   }
 
   DisposableEffect(followLocation) {

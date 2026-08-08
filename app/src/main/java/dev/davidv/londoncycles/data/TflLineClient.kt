@@ -1,6 +1,7 @@
 package dev.davidv.londoncycles.data
 
-import dev.davidv.londoncycles.domain.BusLine
+import dev.davidv.londoncycles.domain.TransitLine
+import dev.davidv.londoncycles.domain.TransportKind
 import dev.davidv.londoncycles.domain.LatLon
 import dev.davidv.londoncycles.domain.LineId
 import dev.davidv.londoncycles.domain.RouteDirection
@@ -18,7 +19,10 @@ import okhttp3.Request
 
 const val TFL_API_BASE = "https://api.tfl.gov.uk"
 
-@Serializable private data class LineDto(val id: String, val name: String)
+
+
+@Serializable
+private data class LineDto(val id: String, val name: String, val modeName: String)
 
 @Serializable
 private data class RouteSequenceDto(
@@ -39,7 +43,7 @@ private data class SequenceStopDto(
 )
 
 sealed interface LinesResult {
-  data class Success(val lines: List<BusLine>) : LinesResult
+  data class Success(val lines: List<TransitLine>) : LinesResult
 
   data class Unreachable(val reason: String) : LinesResult
 
@@ -60,21 +64,31 @@ sealed interface RouteResult {
 class TflLineClient(private val http: OkHttpClient, private val apiBase: String) {
   private val json = Json { ignoreUnknownKeys = true }
 
-  suspend fun busLines(): LinesResult {
+  suspend fun lines(): LinesResult {
     val body =
-      when (val fetched = get("$apiBase/Line/Mode/bus/Route")) {
+      when (val fetched = get("$apiBase/Line/Mode/bus,tube/Route")) {
         is Fetched.Failed -> return LinesResult.Unreachable(fetched.reason)
         is Fetched.Body -> fetched.text
       }
 
     return try {
       LinesResult.Success(
-        json.decodeFromString<List<LineDto>>(body).map { BusLine(LineId(it.id), it.name) }
+        json.decodeFromString<List<LineDto>>(body).mapNotNull { dto ->
+          kindOf(dto.modeName)?.let { TransitLine(LineId(dto.id), dto.name, it) }
+        }
       )
     } catch (e: SerializationException) {
       LinesResult.Unusable(e.message ?: "unrecognised line list")
     }
   }
+
+  /** Anything TfL groups under another mode is not something this map knows how to draw. */
+  private fun kindOf(modeName: String): TransportKind? =
+    when (modeName) {
+      "bus" -> TransportKind.BUS
+      "tube" -> TransportKind.TUBE
+      else -> null
+    }
 
   suspend fun route(line: LineId, direction: RouteDirection): RouteResult {
     val leg = if (direction == RouteDirection.INBOUND) "inbound" else "outbound"
@@ -91,17 +105,20 @@ class TflLineClient(private val http: OkHttpClient, private val apiBase: String)
         return RouteResult.Unusable(e.message ?: "unrecognised route")
       }
 
+    // Branching lines repeat their trunk stations in every branch; the map wants each kerb once.
     val stops =
-      sequence.stopPointSequences.flatMap { branch ->
-        branch.stopPoint.map {
-          RouteStop(
-            id = StopId(it.id),
-            name = it.name,
-            position = LatLon(latitude = it.lat, longitude = it.lon),
-            letter = it.stopLetter,
-          )
+      sequence.stopPointSequences
+        .flatMap { branch ->
+          branch.stopPoint.map {
+            RouteStop(
+              id = StopId(it.id),
+              name = it.name,
+              position = LatLon(latitude = it.lat, longitude = it.lon),
+              letter = it.stopLetter,
+            )
+          }
         }
-      }
+        .distinctBy { it.id }
     val towards = stops.lastOrNull()?.name
     val segments =
       try {

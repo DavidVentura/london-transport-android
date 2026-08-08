@@ -3,6 +3,8 @@ package dev.davidv.londoncycles
 import dev.davidv.londoncycles.data.RouteCache
 import dev.davidv.londoncycles.data.RouteCacheRead
 import dev.davidv.londoncycles.data.RouteChange
+import java.time.Duration
+import java.time.Instant
 import dev.davidv.londoncycles.domain.LatLon
 import dev.davidv.londoncycles.domain.LineId
 import dev.davidv.londoncycles.domain.RouteDirection
@@ -16,6 +18,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+
+private val NOW: Instant = Instant.parse("2026-08-08T09:00:00Z")
 
 private fun route(
   line: String = "43",
@@ -43,9 +47,9 @@ class RouteCacheTest {
   @Test
   fun `a route survives a round trip with its geometry intact`() = runTest {
     val cache = cache()
-    cache.put(route())
+    cache.put(route(), NOW)
 
-    val held = (cache.read() as RouteCacheRead.Held).routes.single()
+    val held = (cache.read() as RouteCacheRead.Held).routes.single().path
 
     assertEquals(LineId("43"), held.line)
     assertEquals(RouteDirection.INBOUND, held.direction)
@@ -60,22 +64,22 @@ class RouteCacheTest {
   fun `a route that moves is reported, an identical one is not`() = runTest {
     val cache = cache()
 
-    assertEquals(RouteChange.FIRST_SEEN, cache.put(route()))
-    assertEquals(RouteChange.UNCHANGED, cache.put(route()))
+    assertEquals(RouteChange.FIRST_SEEN, cache.put(route(), NOW))
+    assertEquals(RouteChange.UNCHANGED, cache.put(route(), NOW))
     assertEquals(
       RouteChange.MOVED,
-      cache.put(route(points = listOf(51.505 to -0.086, 51.600 to -0.150))),
+      cache.put(route(points = listOf(51.505 to -0.086, 51.600 to -0.150)), NOW),
     )
   }
 
   @Test
   fun `the two directions of one line are held apart`() = runTest {
     val cache = cache()
-    cache.put(route(direction = RouteDirection.INBOUND, towards = "Halliwick Park"))
+    cache.put(route(direction = RouteDirection.INBOUND, towards = "Halliwick Park"), NOW)
 
     assertEquals(
       RouteChange.FIRST_SEEN,
-      cache.put(route(direction = RouteDirection.OUTBOUND, towards = "London Bridge")),
+      cache.put(route(direction = RouteDirection.OUTBOUND, towards = "London Bridge"), NOW),
     )
     assertEquals(2, (cache.read() as RouteCacheRead.Held).routes.size)
   }
@@ -83,14 +87,14 @@ class RouteCacheTest {
   @Test
   fun `forgetting a line drops both its directions and leaves the others`() = runTest {
     val cache = cache()
-    cache.put(route(line = "43", direction = RouteDirection.INBOUND))
-    cache.put(route(line = "43", direction = RouteDirection.OUTBOUND))
-    cache.put(route(line = "N5"))
+    cache.put(route(line = "43", direction = RouteDirection.INBOUND), NOW)
+    cache.put(route(line = "43", direction = RouteDirection.OUTBOUND), NOW)
+    cache.put(route(line = "N5"), NOW)
 
     cache.forget(LineId("43"))
 
     val held = (cache.read() as RouteCacheRead.Held).routes
-    assertEquals(listOf(LineId("N5")), held.map { it.line })
+    assertEquals(listOf(LineId("N5")), held.map { it.path.line })
   }
 
   @Test
@@ -103,5 +107,29 @@ class RouteCacheTest {
   @Test
   fun `nothing on disk is not an error`() = runTest {
     assertEquals(RouteCacheRead.Empty, cache("absent.json").read())
+  }
+
+  @Test
+  fun `a route remembers when it was last asked about`() = runTest {
+    val cache = cache()
+    cache.put(route(), NOW)
+
+    val held = (cache.read() as RouteCacheRead.Held).routes.single()
+
+    assertEquals(NOW, held.fetchedAt)
+    assertEquals(Duration.ofHours(5), Duration.between(held.fetchedAt, NOW.plus(Duration.ofHours(5))))
+  }
+
+  @Test
+  fun `a cache written before routes had an age reads as long stale`() = runTest {
+    File(folder.root, "old.json")
+      .writeText(
+        """[{"line":"43","direction":"INBOUND","towards":"Halliwick Park",
+             "segments":[[[51.5,-0.1],[51.6,-0.2]]],"stops":[]}]"""
+      )
+
+    val held = (cache("old.json").read() as RouteCacheRead.Held).routes.single()
+
+    assertEquals(Instant.EPOCH, held.fetchedAt)
   }
 }

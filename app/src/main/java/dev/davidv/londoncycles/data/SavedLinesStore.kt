@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.stringSetPreferencesKey
 import dev.davidv.londoncycles.domain.LineId
 import dev.davidv.londoncycles.domain.RouteDirection
 import dev.davidv.londoncycles.domain.SavedLine
+import dev.davidv.londoncycles.domain.TransportKind
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -16,8 +17,10 @@ class SavedLinesStore(private val store: DataStore<Preferences>) {
       preferences[KEY].orEmpty().map(SavedLine::decode).sortedBy { it.id.value }
     }
 
-  suspend fun add(line: LineId, direction: RouteDirection) {
-    edit { held -> held.filterNot { it.id == line } + SavedLine(line, direction, visible = true) }
+  suspend fun add(line: LineId, kind: TransportKind, direction: RouteDirection) {
+    edit { held ->
+      held.filterNot { it.id == line } + SavedLine(line, kind, direction, visible = true)
+    }
   }
 
   suspend fun setVisible(line: LineId, visible: Boolean) {

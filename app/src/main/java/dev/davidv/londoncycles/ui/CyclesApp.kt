@@ -1,5 +1,6 @@
 package dev.davidv.londoncycles.ui
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -7,9 +8,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.DirectionsBike
 import androidx.compose.material.icons.outlined.DirectionsBus
+import androidx.compose.material.icons.outlined.DirectionsSubway
 import androidx.compose.material.icons.outlined.Map
-import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -27,6 +29,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -36,6 +39,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.davidv.londoncycles.domain.MapFeature
 import dev.davidv.londoncycles.layers.BUS_STOP_LAYER
 import dev.davidv.londoncycles.layers.PIN_LAYER
+import dev.davidv.londoncycles.domain.BikeDisplay
+import dev.davidv.londoncycles.domain.TransportKind
 import dev.davidv.londoncycles.map.DrawnRoute
 import java.time.Duration
 import java.time.ZoneId
@@ -66,9 +71,12 @@ fun CyclesApp(viewModel: CyclesViewModel, routesViewModel: RoutesViewModel) {
   var tab by rememberSaveable { mutableStateOf(Tab.MAP) }
   var picking by rememberSaveable { mutableStateOf(false) }
 
+  val shownKinds = TransportKind.entries.filter(state::shows).toSet()
   val drawn =
-    routes.drawable.map { path -> DrawnRoute(path, routeColour(path.line).toArgb()) }
-  val features = state.visibleFeatures + routes.stopFeatures
+    routes.drawable(shownKinds).mapNotNull { route ->
+      route.path?.let { DrawnRoute(it, routeColour(route.line, route.saved.kind).toArgb()) }
+    }
+  val features = state.visibleFeatures + routes.stopFeatures(shownKinds)
   val selected = features.firstOrNull { it.key == state.selected }
 
   LifecycleResumeEffect(Unit) {
@@ -81,26 +89,34 @@ fun CyclesApp(viewModel: CyclesViewModel, routesViewModel: RoutesViewModel) {
       TopAppBar(
         title = {
           Column {
-            Text(state.layerTitle)
+            Text("London Cycles")
             subtitle(state)?.let { line ->
               Text(line, style = MaterialTheme.typography.labelSmall)
             }
           }
         },
         actions = {
-          IconButton(onClick = viewModel::toggleFavouritesOnly) {
-            Icon(
-              if (state.favouritesOnly) Icons.Filled.Star else Icons.Outlined.StarBorder,
-              contentDescription = "Show favourites only",
-              tint =
-                if (state.favouritesOnly) MaterialTheme.colorScheme.primary
-                else MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+          BikeDisplayButton(display = state.bikeDisplay, onClick = viewModel::cycleBikeDisplay)
+          listOf(TransportKind.BUS, TransportKind.TUBE).forEach { kind ->
+            IconButton(onClick = { viewModel.toggleKind(kind) }) {
+              Icon(
+                kindIcon(kind),
+                contentDescription = "Show ${kindLabel(kind)}",
+                tint =
+                  if (state.shows(kind)) MaterialTheme.colorScheme.primary
+                  else MaterialTheme.colorScheme.outlineVariant,
+              )
+            }
           }
           if (state.refreshing) {
             CircularProgressIndicator(modifier = Modifier.padding(16.dp).size(24.dp))
           } else {
-            IconButton(onClick = viewModel::refresh) {
+            IconButton(
+              onClick = {
+                viewModel.refresh()
+                routesViewModel.refreshNow()
+              }
+            ) {
               Icon(Icons.Filled.Refresh, contentDescription = "Refresh")
             }
           }
@@ -194,6 +210,49 @@ fun CyclesApp(viewModel: CyclesViewModel, routesViewModel: RoutesViewModel) {
           feature = selected,
           favourite = selected.key in state.favourites,
           onToggleFavourite = { viewModel.toggleFavourite(selected.key) },
+        )
+      }
+    }
+  }
+}
+
+private fun kindIcon(kind: TransportKind): ImageVector =
+  when (kind) {
+    TransportKind.BIKE -> Icons.Outlined.DirectionsBike
+    TransportKind.BUS -> Icons.Outlined.DirectionsBus
+    TransportKind.TUBE -> Icons.Outlined.DirectionsSubway
+  }
+
+private fun kindLabel(kind: TransportKind): String =
+  when (kind) {
+    TransportKind.BIKE -> "cycle hire"
+    TransportKind.BUS -> "buses"
+    TransportKind.TUBE -> "tube"
+  }
+
+/** Off, starred only, or every station — one button rather than a toggle plus a filter. */
+@Composable
+private fun BikeDisplayButton(display: BikeDisplay, onClick: () -> Unit) {
+  IconButton(onClick = onClick) {
+    Box(contentAlignment = Alignment.Center) {
+      Icon(
+        Icons.Outlined.DirectionsBike,
+        contentDescription =
+          when (display) {
+            BikeDisplay.NONE -> "Docking stations hidden"
+            BikeDisplay.FAVOURITES -> "Favourite docking stations only"
+            BikeDisplay.ALL -> "All docking stations"
+          },
+        tint =
+          if (display == BikeDisplay.NONE) MaterialTheme.colorScheme.outlineVariant
+          else MaterialTheme.colorScheme.primary,
+      )
+      if (display == BikeDisplay.FAVOURITES) {
+        Icon(
+          Icons.Filled.Star,
+          contentDescription = null,
+          tint = MaterialTheme.colorScheme.primary,
+          modifier = Modifier.size(11.dp).align(Alignment.TopEnd),
         )
       }
     }

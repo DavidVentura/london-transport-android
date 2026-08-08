@@ -10,6 +10,7 @@ import dev.davidv.londoncycles.domain.AvailabilityLevel
 import dev.davidv.londoncycles.domain.FeatureKey
 import dev.davidv.londoncycles.domain.LatLon
 import dev.davidv.londoncycles.domain.LineId
+import dev.davidv.londoncycles.domain.TransportKind
 import dev.davidv.londoncycles.domain.MapFeature
 import dev.davidv.londoncycles.domain.MarkerStyle
 import org.osmdroid.util.GeoPoint
@@ -29,7 +30,7 @@ private const val PIN_COLOUR = 0xFF7B1FA2.toInt()
 class FeatureOverlay(
   private val density: Float,
   private val colourOf: (AvailabilityLevel) -> Int,
-  private val lineColourOf: (LineId) -> Int,
+  private val lineColourOf: (LineId, TransportKind) -> Int,
   private val onSelect: (MapFeature?) -> Unit,
   private val onPlacePin: (LatLon) -> Unit,
 ) : Overlay() {
@@ -96,7 +97,7 @@ class FeatureOverlay(
         MarkerStyle.Pin -> drawPin(canvas, entry.feature, x, y, projection.zoomLevel)
         is MarkerStyle.Stop ->
           if (projection.zoomLevel >= STOPS_FROM_ZOOM) {
-            drawStop(canvas, entry.feature, marker.line, x, y)
+            drawStop(canvas, entry.feature, marker, x, y)
           }
       }
     }
@@ -161,11 +162,17 @@ class FeatureOverlay(
   }
 
   /** A ring rather than a disc, so a stop never reads as a docking station. */
-  private fun drawStop(canvas: Canvas, feature: MapFeature, line: LineId, x: Float, y: Float) {
+  private fun drawStop(
+    canvas: Canvas,
+    feature: MapFeature,
+    marker: MarkerStyle.Stop,
+    x: Float,
+    y: Float,
+  ) {
     val radius = stopRadius
     fill.color = Color.WHITE
     canvas.drawCircle(x, y, radius, fill)
-    stopRing.color = lineColourOf(line)
+    stopRing.color = lineColourOf(marker.line, marker.kind)
     stopRing.strokeWidth = radius * 0.55f
     canvas.drawCircle(x, y, radius, stopRing)
     if (feature.key == selected) {

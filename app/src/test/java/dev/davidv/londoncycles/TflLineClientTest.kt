@@ -1,5 +1,6 @@
 package dev.davidv.londoncycles
 
+import dev.davidv.londoncycles.data.LinesResult
 import dev.davidv.londoncycles.data.RouteResult
 import dev.davidv.londoncycles.data.TflLineClient
 import dev.davidv.londoncycles.domain.LatLon
@@ -76,10 +77,47 @@ class TflLineClientTest {
   }
 
   @Test
-  fun `a line with no geometry is not served this way`() = runTest {
-    server.enqueue(MockResponse().setBody("""{"lineId":"U9","lineStrings":[]}"""))
+  fun `a line with no ordered points is simply not served`() = runTest {
+    server.enqueue(MockResponse().setBody("""{"lineId":"bakerloo","lineStrings":[]}"""))
 
-    assertEquals(RouteResult.NotServed, client().route(LineId("U9"), RouteDirection.INBOUND))
+    assertEquals(
+      RouteResult.NotServed,
+      client().route(LineId("bakerloo"), RouteDirection.INBOUND),
+    )
+  }
+
+  @Test
+  fun `a branching line lists each shared station once`() = runTest {
+    server.enqueue(
+      MockResponse().setBody(
+        """{"lineId":"northern","lineStrings":["[[[-0.1,51.5],[-0.11,51.51]]]"],
+           "stopPointSequences":[
+             {"stopPoint":[{"id":"940A","name":"Camden Town","lat":51.539,"lon":-0.142},
+                           {"id":"940B","name":"Euston","lat":51.528,"lon":-0.133}]},
+             {"stopPoint":[{"id":"940A","name":"Camden Town","lat":51.539,"lon":-0.142},
+                           {"id":"940C","name":"Bank","lat":51.513,"lon":-0.089}]}]}"""
+      )
+    )
+
+    val path = (client().route(LineId("northern"), RouteDirection.INBOUND) as RouteResult.Success)
+      .path
+
+    assertEquals(listOf("Camden Town", "Euston", "Bank"), path.stops.map { it.name })
+  }
+
+  @Test
+  fun `only modes the map can draw reach the catalogue`() = runTest {
+    server.enqueue(
+      MockResponse().setBody(
+        """[{"id":"victoria","name":"Victoria","modeName":"tube"},
+            {"id":"43","name":"43","modeName":"bus"},
+            {"id":"dlr","name":"DLR","modeName":"dlr"}]"""
+      )
+    )
+
+    val lines = (client().lines() as LinesResult.Success).lines
+
+    assertEquals(listOf("Victoria", "43"), lines.map { it.name })
   }
 
   @Test

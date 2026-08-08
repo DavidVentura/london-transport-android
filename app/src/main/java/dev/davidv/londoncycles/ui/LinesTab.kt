@@ -5,11 +5,15 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.SwapVert
@@ -29,8 +33,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import dev.davidv.londoncycles.domain.LineId
 import dev.davidv.londoncycles.domain.RouteDirection
+import dev.davidv.londoncycles.domain.TransportKind
+
+private val BUS_PILL = 52.dp
+private val TUBE_PILL = 104.dp
 
 @Composable
 fun LinesTab(
@@ -55,7 +64,7 @@ fun LinesTab(
       if (state.routes.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
           Text(
-            "Add a bus route to draw it on the map.",
+            "Add a bus route or tube line to draw it on the map.",
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(32.dp),
@@ -70,28 +79,9 @@ fun LinesTab(
             modifier = Modifier.fillMaxWidth().padding(start = 16.dp, top = 12.dp, bottom = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
           ) {
-            Surface(
-              color =
-                if (route.saved.visible) routeColour(route.line)
-                else MaterialTheme.colorScheme.surfaceVariant,
-              shape = RoundedCornerShape(6.dp),
-              modifier = Modifier.size(width = 52.dp, height = 34.dp),
-            ) {
-              Box(contentAlignment = Alignment.Center) {
-                Text(
-                  route.line.value,
-                  style = MaterialTheme.typography.titleMedium,
-                  color =
-                    if (route.saved.visible) Color.White
-                    else MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-              }
-            }
+            LinePill(route)
             Column(modifier = Modifier.weight(1f).padding(start = 16.dp)) {
-              Text(
-                route.path?.let { "towards ${it.towards}" } ?: route.unavailable ?: "Loading…",
-                style = MaterialTheme.typography.bodyLarge,
-              )
+              Text(describe(route), style = MaterialTheme.typography.bodyLarge)
               if (route.moved) {
                 Text(
                   "Route changed since you last checked",
@@ -100,15 +90,20 @@ fun LinesTab(
                 )
               }
             }
+            // A tube line runs the same rails whichever way you board, so there is nothing to flip.
+            if (route.saved.kind == TransportKind.TUBE) {
+              Box(modifier = Modifier.size(48.dp))
+            } else {
+              IconButton(onClick = { onDirection(route.line, opposite(route.saved.direction)) }) {
+                Icon(Icons.Filled.SwapVert, contentDescription = "Switch direction")
+              }
+            }
             IconButton(onClick = { onVisibility(route.line, !route.saved.visible) }) {
               Icon(
                 if (route.saved.visible) Icons.Outlined.Visibility
                 else Icons.Outlined.VisibilityOff,
                 contentDescription = if (route.saved.visible) "Hide on map" else "Show on map",
               )
-            }
-            IconButton(onClick = { onDirection(route.line, opposite(route.saved.direction)) }) {
-              Icon(Icons.Filled.SwapVert, contentDescription = "Switch direction")
             }
             IconButton(onClick = { onForget(route.line) }) {
               Icon(Icons.Outlined.Delete, contentDescription = "Remove line")
@@ -126,6 +121,42 @@ fun LinesTab(
       modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
     )
   }
+}
+
+/** Fixed width per kind so the rows line up; a long line name shrinks rather than wraps. */
+@Composable
+private fun LinePill(route: SavedRoute) {
+  Surface(
+    color =
+      if (route.saved.visible) routeColour(route.line, route.saved.kind)
+      else MaterialTheme.colorScheme.surfaceVariant,
+    shape = RoundedCornerShape(6.dp),
+    modifier =
+      Modifier.width(if (route.saved.kind == TransportKind.TUBE) TUBE_PILL else BUS_PILL)
+        .height(34.dp),
+  ) {
+    Box(contentAlignment = Alignment.Center) {
+      BasicText(
+        text = lineLabel(route.line, route.saved.kind),
+        maxLines = 1,
+        autoSize = TextAutoSize.StepBased(minFontSize = 9.sp, maxFontSize = 16.sp),
+        style =
+          MaterialTheme.typography.titleMedium.copy(
+            color =
+              if (route.saved.visible) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+          ),
+        modifier = Modifier.padding(horizontal = 6.dp),
+      )
+    }
+  }
+}
+
+private fun describe(route: SavedRoute): String {
+  val path = route.path ?: return route.unavailable ?: "Loading…"
+  // Every tube stop is on the line whichever way you go, so a destination says nothing.
+  if (route.saved.kind != TransportKind.TUBE) return "towards ${path.towards}"
+  return if (path.stops.size == 1) "1 station" else "${path.stops.size} stations"
 }
 
 private fun opposite(direction: RouteDirection): RouteDirection =
