@@ -13,5 +13,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "London Cycles"
+rootProject.name = "London Transport"
 include(":app")

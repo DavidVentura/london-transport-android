@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-  namespace = "dev.davidv.londoncycles"
+  namespace = "dev.davidv.londontransport"
   compileSdk = 36
 
   defaultConfig {
-    applicationId = "dev.davidv.londoncycles"
+    applicationId = "dev.davidv.londontransport"
     minSdk = 26
     targetSdk = 36
     versionCode = 1
