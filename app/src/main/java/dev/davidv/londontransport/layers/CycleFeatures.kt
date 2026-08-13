@@ -36,11 +36,13 @@ private fun level(status: StationStatus): AvailabilityLevel =
       }
   }
 
+/** Bikes over docks rather than bikes alone, so a full stand reads as one you cannot park at. */
 private fun badge(status: StationStatus): String =
   when (status) {
     StationStatus.Unknown -> "?"
     is StationStatus.Live ->
-      if (status.state == StationState.OPERATIONAL) status.bikes.total.toString() else "—"
+      if (status.state == StationState.OPERATIONAL) "${status.bikes.total}/${status.capacity}"
+      else "—"
   }
 
 private fun summary(status: StationStatus): String =

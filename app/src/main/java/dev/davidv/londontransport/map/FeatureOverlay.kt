@@ -82,7 +82,6 @@ class FeatureOverlay(
     val margin = pinHeight + radius * 2f
     outline.strokeWidth = radius * 0.2f
     highlight.strokeWidth = radius * 0.35f
-    badgeText.textSize = radius * 1.3f
 
     for (entry in placed) {
       projection.toPixels(entry.point, scratch)
@@ -130,8 +129,18 @@ class FeatureOverlay(
       }
     }
     if (zoom >= LABELLED_FROM_ZOOM) {
-      canvas.drawText(feature.badge, x, y + radius * 0.45f, badgeText)
+      drawBadge(canvas, feature.badge, x, y, radius)
     }
+  }
+
+  /** Badges run from one character to five ("12/24"), so the text is shrunk to fit the dot. */
+  private fun drawBadge(canvas: Canvas, badge: String, x: Float, y: Float, radius: Float) {
+    val nominal = radius * 1.3f
+    badgeText.textSize = nominal
+    val room = radius * 1.7f
+    val width = badgeText.measureText(badge)
+    if (width > room) badgeText.textSize = nominal * room / width
+    canvas.drawText(badge, x, y + badgeText.textSize * 0.35f, badgeText)
   }
 
   /** Anchored at its tip, so the point the user pressed stays under the pin. */
@@ -230,7 +239,7 @@ class FeatureOverlay(
   private fun dotRadiusFor(zoom: Double): Float =
     density *
       when {
-        zoom >= LABELLED_FROM_ZOOM -> 11f
+        zoom >= LABELLED_FROM_ZOOM -> 13f
         zoom >= MEDIUM_FROM_ZOOM -> 6f
         else -> 3.5f
       }

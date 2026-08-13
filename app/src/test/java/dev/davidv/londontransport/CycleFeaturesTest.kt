@@ -41,6 +41,12 @@ class CycleFeaturesTest {
   }
 
   @Test
+  fun `the badge counts bikes against the whole stand`() {
+    assertEquals("5/20", stationFeature(station(3, 2)).badge)
+    assertEquals("0/20", stationFeature(station(0)).badge)
+  }
+
+  @Test
   fun `a closed station reads as unavailable whatever it holds`() {
     val feature = stationFeature(station(standard = 12, state = StationState.LOCKED))
 

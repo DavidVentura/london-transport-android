@@ -1,5 +1,6 @@
 package dev.davidv.londontransport.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -70,6 +71,8 @@ fun CyclesApp(viewModel: CyclesViewModel, routesViewModel: RoutesViewModel) {
   val routes by routesViewModel.state.collectAsStateWithLifecycle()
   var tab by rememberSaveable { mutableStateOf(Tab.MAP) }
   var picking by rememberSaveable { mutableStateOf(false) }
+
+  BackHandler(enabled = tab != Tab.MAP) { tab = Tab.MAP }
 
   val shownKinds = TransportKind.entries.filter(state::shows).toSet()
   val drawn =
