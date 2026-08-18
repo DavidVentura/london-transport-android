@@ -31,6 +31,7 @@ sealed interface StationStatus {
 
 data class Station(
   val id: StationId,
+  val terminal: TerminalName,
   val name: String,
   val position: LatLon,
   val status: StationStatus,

@@ -1,0 +1,43 @@
+[
+ {
+  "Type": "Node.FormControls.Label",
+  "ID": "member_sms_desc1",
+  "Name": "We have sent a verification code to the mobile number on your account."
+ },
+ {
+  "Type": "Node.FormControls.TextBox",
+  "ID": "lchs_pincode_1",
+  "Name": ""
+ },
+ {
+  "Type": "Node.FormControls.TextBox",
+  "ID": "lchs_pincode_2",
+  "Name": ""
+ },
+ {
+  "Type": "Node.FormControls.TextBox",
+  "ID": "lchs_pincode_3",
+  "Name": ""
+ },
+ {
+  "Type": "Node.FormControls.TextBox",
+  "ID": "lchs_pincode_4",
+  "Name": ""
+ },
+ {
+  "Type": "Node.FormControls.TextBox",
+  "ID": "lchs_pincode_5",
+  "Name": ""
+ },
+ {
+  "Type": "Node.FormControls.TextBox",
+  "ID": "lchs_pincode_6",
+  "Name": ""
+ },
+ {
+  "Type": "Node.FormControls.Button",
+  "ID": "member_next_button_sms",
+  "Name": "Verify",
+  "TargetUri": "part://Clients.TfL.GenerateLCHSMembershipVerifyForm?TerminalName=000000&Submit=1"
+ }
+]

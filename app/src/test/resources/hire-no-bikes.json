@@ -1,0 +1,14 @@
+[
+ {
+  "Type": "Node.Internal.SimpleResponse",
+  "ID": "node1",
+  "Name": "Sorry, but there are no bikes available at this location. Please choose a different location to start a new bike access period.",
+  "SortOrder": "0",
+  "TTL": "3600",
+  "Language": "",
+  "TimeStamp": "2020-01-01T00:00:00.0000000Z",
+  "CommonChildType": "",
+  "AncestorIDArray": [],
+  "TreeMode": "Leaf"
+ }
+]

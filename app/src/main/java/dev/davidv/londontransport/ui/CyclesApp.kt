@@ -66,9 +66,14 @@ private fun subtitle(state: CyclesState): String? =
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CyclesApp(viewModel: CyclesViewModel, routesViewModel: RoutesViewModel) {
+fun CyclesApp(
+  viewModel: CyclesViewModel,
+  routesViewModel: RoutesViewModel,
+  hireViewModel: HireViewModel,
+) {
   val state by viewModel.state.collectAsStateWithLifecycle()
   val routes by routesViewModel.state.collectAsStateWithLifecycle()
+  val hire by hireViewModel.state.collectAsStateWithLifecycle()
   var tab by rememberSaveable { mutableStateOf(Tab.MAP) }
   var picking by rememberSaveable { mutableStateOf(false) }
 
@@ -89,42 +94,54 @@ fun CyclesApp(viewModel: CyclesViewModel, routesViewModel: RoutesViewModel) {
 
   Scaffold(
     topBar = {
-      TopAppBar(
-        title = {
-          Column {
-            Text("London Transport")
-            subtitle(state)?.let { line ->
-              Text(line, style = MaterialTheme.typography.labelSmall)
-            }
-          }
-        },
-        actions = {
-          BikeDisplayButton(display = state.bikeDisplay, onClick = viewModel::cycleBikeDisplay)
-          listOf(TransportKind.BUS, TransportKind.TUBE).forEach { kind ->
-            IconButton(onClick = { viewModel.toggleKind(kind) }) {
-              Icon(
-                kindIcon(kind),
-                contentDescription = "Show ${kindLabel(kind)}",
-                tint =
-                  if (state.shows(kind)) MaterialTheme.colorScheme.primary
-                  else MaterialTheme.colorScheme.outlineVariant,
-              )
-            }
-          }
-          if (state.refreshing) {
-            CircularProgressIndicator(modifier = Modifier.padding(16.dp).size(24.dp))
-          } else {
-            IconButton(
-              onClick = {
-                viewModel.refresh()
-                routesViewModel.refreshNow()
+      Column {
+        TopAppBar(
+          title = {
+            Column {
+              Text("London Transport")
+              subtitle(state)?.let { line ->
+                Text(line, style = MaterialTheme.typography.labelSmall)
               }
-            ) {
-              Icon(Icons.Filled.Refresh, contentDescription = "Refresh")
             }
-          }
-        },
-      )
+          },
+          actions = {
+            BikeDisplayButton(display = state.bikeDisplay, onClick = viewModel::cycleBikeDisplay)
+            listOf(TransportKind.BUS, TransportKind.TUBE).forEach { kind ->
+              IconButton(onClick = { viewModel.toggleKind(kind) }) {
+                Icon(
+                  kindIcon(kind),
+                  contentDescription = "Show ${kindLabel(kind)}",
+                  tint =
+                    if (state.shows(kind)) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.outlineVariant,
+                )
+              }
+            }
+            if (state.refreshing) {
+              CircularProgressIndicator(modifier = Modifier.padding(16.dp).size(24.dp))
+            } else {
+              IconButton(
+                onClick = {
+                  viewModel.refresh()
+                  routesViewModel.refreshNow()
+                }
+              ) {
+                Icon(Icons.Filled.Refresh, contentDescription = "Refresh")
+              }
+            }
+          },
+        )
+        hire.active?.let { active ->
+          ReleaseCodeBar(
+            hire = active,
+            onOpen = {
+              features.firstOrNull { it.key == active.station }?.let(viewModel::focusOn)
+              tab = Tab.MAP
+            },
+            onDismiss = hireViewModel::dismissCode,
+          )
+        }
+      }
     },
     bottomBar = {
       NavigationBar {
@@ -213,9 +230,37 @@ fun CyclesApp(viewModel: CyclesViewModel, routesViewModel: RoutesViewModel) {
           feature = selected,
           favourite = selected.key in state.favourites,
           onToggleFavourite = { viewModel.toggleFavourite(selected.key) },
+          hire = hire,
+          onRent = { target ->
+            hireViewModel.rent(HireRequest(selected.key, selected.title, target))
+          },
         )
       }
     }
+  }
+
+  when (val flow = hire.flow) {
+    is HireFlow.Login ->
+      ModalBottomSheet(
+        onDismissRequest = hireViewModel::dismiss,
+        sheetState = rememberModalBottomSheetState(),
+      ) {
+        LoginSheet(
+          stationName = flow.request.stationName,
+          busy = flow.busy,
+          error = flow.error,
+          onSubmit = hireViewModel::submitLogin,
+        )
+      }
+    is HireFlow.Verify ->
+      VerifyDialog(
+        challenge = flow.challenge,
+        busy = flow.busy,
+        error = flow.error,
+        onSubmit = hireViewModel::submitVerification,
+        onDismiss = hireViewModel::dismiss,
+      )
+    else -> Unit
   }
 }
 

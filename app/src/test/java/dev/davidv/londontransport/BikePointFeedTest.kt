@@ -5,6 +5,7 @@ import dev.davidv.londontransport.data.tidyName
 import dev.davidv.londontransport.domain.StationId
 import dev.davidv.londontransport.domain.StationState
 import dev.davidv.londontransport.domain.StationStatus
+import dev.davidv.londontransport.domain.TerminalName
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -14,6 +15,7 @@ private fun station(
   name: String = "Somewhere, London",
   properties: String =
     """
+    {"key":"TerminalName","value":"001023"},
     {"key":"NbBikes","value":"9"},
     {"key":"NbStandardBikes","value":"7"},
     {"key":"NbEBikes","value":"2"},
@@ -43,6 +45,7 @@ class BikePointFeedTest {
     assertTrue(feed.malformed.isEmpty())
     val parsed = feed.stations.single()
     assertEquals(StationId("BikePoints_1"), parsed.id)
+    assertEquals(TerminalName("001023"), parsed.terminal)
     assertEquals(51.529163, parsed.position.latitude, 1e-9)
     val status = parsed.status as StationStatus.Live
     assertEquals(7, status.bikes.standard)
@@ -51,6 +54,24 @@ class BikePointFeedTest {
     assertEquals(3, status.emptyDocks)
     assertEquals(14, status.capacity)
     assertEquals(StationState.OPERATIONAL, status.state)
+  }
+
+  @Test
+  fun `a station with no terminal name cannot be hired from, so it is dropped`() {
+    val feed =
+      parseBikePointFeed(
+        "[${station("BikePoints_9", properties = """
+          {"key":"NbStandardBikes","value":"7"},
+          {"key":"NbEBikes","value":"2"},
+          {"key":"NbEmptyDocks","value":"3"},
+          {"key":"NbDocks","value":"14"},
+          {"key":"Installed","value":"true"},
+          {"key":"Locked","value":"false"}
+          """)}]"
+      )
+
+    assertTrue(feed.stations.isEmpty())
+    assertEquals("no TerminalName", feed.malformed.single().reason)
   }
 
   @Test
@@ -85,6 +106,7 @@ class BikePointFeedTest {
   fun `locked and uninstalled stations keep their state`() {
     val flags = { installed: String, locked: String ->
       """
+      {"key":"TerminalName","value":"001023"},
       {"key":"NbStandardBikes","value":"0"},
       {"key":"NbEBikes","value":"0"},
       {"key":"NbEmptyDocks","value":"0"},

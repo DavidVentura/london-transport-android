@@ -6,6 +6,7 @@ import dev.davidv.londontransport.domain.Station
 import dev.davidv.londontransport.domain.StationId
 import dev.davidv.londontransport.domain.StationState
 import dev.davidv.londontransport.domain.StationStatus
+import dev.davidv.londontransport.domain.TerminalName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -55,6 +56,11 @@ private fun toStation(dto: BikePointDto): StationParse {
 
   fun count(key: String): Int? = properties[key]?.toIntOrNull()
 
+  val terminal = properties["TerminalName"]
+  if (terminal == null) {
+    return StationParse.Malformed(MalformedStation(dto.id, "no TerminalName"))
+  }
+
   val standard = count("NbStandardBikes")
   val electric = count("NbEBikes")
   val emptyDocks = count("NbEmptyDocks")
@@ -72,6 +78,7 @@ private fun toStation(dto: BikePointDto): StationParse {
   return StationParse.Parsed(
     Station(
       id = StationId(dto.id),
+      terminal = TerminalName(terminal),
       name = tidyName(dto.commonName),
       position = LatLon(dto.lat, dto.lon),
       status =

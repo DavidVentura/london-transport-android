@@ -8,6 +8,7 @@ import dev.davidv.londontransport.domain.Station
 import dev.davidv.londontransport.domain.StationId
 import dev.davidv.londontransport.domain.StationState
 import dev.davidv.londontransport.domain.StationStatus
+import dev.davidv.londontransport.domain.TerminalName
 import dev.davidv.londontransport.layers.stationFeature
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -20,6 +21,7 @@ private fun station(
 ) =
   Station(
     id = StationId("BikePoints_1"),
+    terminal = TerminalName("001023"),
     name = "River Street, Clerkenwell",
     position = LatLon(51.5, -0.1),
     status =

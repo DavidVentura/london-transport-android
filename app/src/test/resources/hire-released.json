@@ -1,0 +1,549 @@
+[
+ {
+  "Type": "Node",
+  "ID": "node1",
+  "Name": "Unlock your bike",
+  "SortOrder": "0",
+  "TTL": "3600",
+  "Language": "",
+  "TimeStamp": "2020-01-01T00:00:00.0000000Z",
+  "CommonChildType": "Node",
+  "AncestorIDArray": [],
+  "Tags": {
+   "Style.Class": "header",
+   "ClientAction.Nodes.ForceExpiry": "lchs_root_v2",
+   "GoogleAnalyticsJson": "{\"Analytics.Type\":\"Screen\",\"Analytics.Label\":\"Release code screen\"}",
+   "Style.Header.BackgroundColor": "#EF0000",
+   "Style.Header.ForegroundColor": "#FFFFFF",
+   "Style.Header.DisableTransparency": "1",
+   "Style.Header.FontName": "NJFont-Medium",
+   "Style.Header.FontSize": "18",
+   "Style.Cell.FontName": "NJFont-Medium",
+   "Style.Cell.FontSize": "18",
+   "Style.Body.BackgroundColor": "#FFFFFF",
+   "Style.Page.HideDividers": "1",
+   "Style.Page.DisableDropShadow": "1",
+   "Style.Page.RefreshIndicatorColor": "#EF0000",
+   "Style.Page.PinToTopLevel": "above",
+   "ClientAction.Forms.ClearCache": "1",
+   "ClientAction.Navigate.Back": "1",
+   "DisableUpdate": "1"
+  }
+ },
+ {
+  "Type": "Node",
+  "ID": "node2",
+  "Name": "Your cycle hire release code:",
+  "Subtitle": "11111",
+  "SortOrder": "1",
+  "TTL": "3600",
+  "Language": "",
+  "TimeStamp": "2020-01-01T00:00:00.0000000Z",
+  "CommonChildType": "",
+  "AncestorIDArray": [
+   "node1"
+  ],
+  "TreeMode": "Leaf",
+  "Tags": {
+   "Style.Class": "page_release",
+   "Style.Cell.ForegroundColor": "#FFFFFF",
+   "Style.Cell.BackgroundColor": "#03119A",
+   "Style.Cell.FontName": "NJFont-Light",
+   "Style.Cell.Padding": "30 10 30 10",
+   "Style.Cell.FontSize": "14px",
+   "Style.Cell.TextAlign": "center",
+   "Style.Cell.Subtitle.FontSize": "35px",
+   "Style.Cell.Subtitle.FontName": "NJFont-Medium"
+  },
+  "ParentID": "node1"
+ },
+ {
+  "Type": "Node.FormControls.Label",
+  "ID": "node3",
+  "Name": "River Street, Clerkenwell",
+  "SortOrder": "2",
+  "TTL": "3600",
+  "Language": "",
+  "TimeStamp": "2020-01-01T00:00:00.0000000Z",
+  "CommonChildType": "",
+  "AncestorIDArray": [
+   "node1"
+  ],
+  "TreeMode": "Leaf",
+  "Tags": {
+   "Style.Class": "terminal_title",
+   "Style.Cell.FontName": "NJFont-Medium",
+   "Style.Cell.TextAlign": "center",
+   "Style.Cell.ForegroundColor": "#000000",
+   "Style.Cell.BackgroundColor": "#E3E3E3",
+   "Style.Cell.FontSize": "16px",
+   "Style.Cell.Padding": "20"
+  },
+  "ParentID": "node1"
+ },
+ {
+  "Type": "Node.FormControls.Label",
+  "ID": "node4",
+  "Name": "How to release a bike:",
+  "SortOrder": "3",
+  "TTL": "3600",
+  "Language": "",
+  "TimeStamp": "2020-01-01T00:00:00.0000000Z",
+  "CommonChildType": "",
+  "AncestorIDArray": [
+   "node1"
+  ],
+  "TreeMode": "Leaf",
+  "Tags": {
+   "Style.Class": "page_title1",
+   "Style.Cell.FontName": "NJFont-Medium",
+   "Style.Cell.TextAlign": "left",
+   "Style.Cell.ForegroundColor": "#000000",
+   "Style.Cell.FontSize": "16px",
+   "Style.Cell.Padding": "20"
+  },
+  "ParentID": "node1"
+ },
+ {
+  "Type": "Node",
+  "ID": "node5",
+  "Name": "&#8226;",
+  "SortOrder": "4",
+  "TTL": "3600",
+  "Language": "",
+  "TimeStamp": "2020-01-01T00:00:00.0000000Z",
+  "CommonChildType": "",
+  "AncestorIDArray": [
+   "node1"
+  ],
+  "TreeMode": "Leaf",
+  "Tags": {
+   "Style.Class": "member_desc01",
+   "Style.Cell.Width": "12%",
+   "Style.Cell.Margin": "0 0 10 30",
+   "Style.Cell.Padding": "0 10 0 20",
+   "Style.Cell.FontName": "NJFont-Light",
+   "Style.Cell.HideNativeWidgets": "1"
+  },
+  "ParentID": "node1"
+ },
+ {
+  "Type": "Node",
+  "ID": "node6",
+  "Name": "Select a regular cycle or an ebike from one of the docking points nearby.",
+  "SortOrder": "5",
+  "TTL": "3600",
+  "Language": "",
+  "TimeStamp": "2020-01-01T00:00:00.0000000Z",
+  "CommonChildType": "",
+  "AncestorIDArray": [
+   "node1"
+  ],
+  "TreeMode": "Leaf",
+  "Tags": {
+   "Style.Class": "member_desc1",
+   "Style.Cell.Width": "88%",
+   "Style.Cell.FontName": "NJFont-Light",
+   "Style.Cell.Margin": "0 10 10 0",
+   "Style.Cell.Padding": "0 45 0 10",
+   "Style.Cell.FontSize": "14px",
+   "Style.Cell.HideNativeWidgets": "1"
+  },
+  "ParentID": "node1"
+ },
+ {
+  "Type": "Node",
+  "ID": "node7",
+  "Name": "&#8226;",
+  "SortOrder": "6",
+  "TTL": "3600",
+  "Language": "",
+  "TimeStamp": "2020-01-01T00:00:00.0000000Z",
+  "CommonChildType": "",
+  "AncestorIDArray": [
+   "node1"
+  ],
+  "TreeMode": "Leaf",
+  "Tags": {
+   "Style.Class": "member_desc02",
+   "Style.Cell.Width": "12%",
+   "Style.Cell.Margin": "0 0 10 30",
+   "Style.Cell.Padding": "0 10 0 20",
+   "Style.Cell.FontName": "NJFont-Light",
+   "Style.Cell.HideNativeWidgets": "1"
+  },
+  "ParentID": "node1"
+ },
+ {
+  "Type": "Node",
+  "ID": "node8",
+  "Name": "If you choose to undock an ebike, there will be extra charges (see Pricing).",
+  "SortOrder": "7",
+  "TTL": "3600",
+  "Language": "",
+  "TimeStamp": "2020-01-01T00:00:00.0000000Z",
+  "CommonChildType": "",
+  "AncestorIDArray": [
+   "node1"
+  ],
+  "TreeMode": "Leaf",
+  "Tags": {
+   "Style.Class": "member_desc2",
+   "Style.Cell.Width": "88%",
+   "Style.Cell.FontName": "NJFont-Light",
+   "Style.Cell.Margin": "0 10 10 0",
+   "Style.Cell.Padding": "0 45 0 10",
+   "Style.Cell.FontSize": "14px",
+   "Style.Cell.HideNativeWidgets": "1"
+  },
+  "ParentID": "node1"
+ },
+ {
+  "Type": "Node",
+  "ID": "node9",
+  "Name": "&#8226;",
+  "SortOrder": "8",
+  "TTL": "3600",
+  "Language": "",
+  "TimeStamp": "2020-01-01T00:00:00.0000000Z",
+  "CommonChildType": "",
+  "AncestorIDArray": [
+   "node1"
+  ],
+  "TreeMode": "Leaf",
+  "Tags": {
+   "Style.Class": "member_desc03",
+   "Style.Cell.Width": "12%",
+   "Style.Cell.Margin": "0 0 10 30",
+   "Style.Cell.Padding": "0 10 0 20",
+   "Style.Cell.FontName": "NJFont-Light",
+   "Style.Cell.HideNativeWidgets": "1"
+  },
+  "ParentID": "node1"
+ },
+ {
+  "Type": "Node",
+  "ID": "node10",
+  "Name": "Enter the release code using the keypad to the left of the handlebars.",
+  "SortOrder": "9",
+  "TTL": "3600",
+  "Language": "",
+  "TimeStamp": "2020-01-01T00:00:00.0000000Z",
+  "CommonChildType": "",
+  "AncestorIDArray": [
+   "node1"
+  ],
+  "TreeMode": "Leaf",
+  "Tags": {
+   "Style.Class": "member_desc3",
+   "Style.Cell.Width": "88%",
+   "Style.Cell.FontName": "NJFont-Light",
+   "Style.Cell.Margin": "0 10 10 0",
+   "Style.Cell.Padding": "0 45 0 10",
+   "Style.Cell.FontSize": "14px",
+   "Style.Cell.HideNativeWidgets": "1"
+  },
+  "ParentID": "node1"
+ },
+ {
+  "Type": "Node",
+  "ID": "node11",
+  "Name": "&#8226;",
+  "SortOrder": "10",
+  "TTL": "3600",
+  "Language": "",
+  "TimeStamp": "2020-01-01T00:00:00.0000000Z",
+  "CommonChildType": "",
+  "AncestorIDArray": [
+   "node1"
+  ],
+  "TreeMode": "Leaf",
+  "Tags": {
+   "Style.Class": "member_desc04",
+   "Style.Cell.Width": "12%",
+   "Style.Cell.Margin": "0 0 10 30",
+   "Style.Cell.Padding": "0 10 0 20",
+   "Style.Cell.FontName": "NJFont-Light",
+   "Style.Cell.HideNativeWidgets": "1"
+  },
+  "ParentID": "node1"
+ },
+ {
+  "Type": "Node",
+  "ID": "node12",
+  "Name": "On the green light, you're good to go.",
+  "SortOrder": "11",
+  "TTL": "3600",
+  "Language": "",
+  "TimeStamp": "2020-01-01T00:00:00.0000000Z",
+  "CommonChildType": "",
+  "AncestorIDArray": [
+   "node1"
+  ],
+  "TreeMode": "Leaf",
+  "Tags": {
+   "Style.Class": "member_desc4",
+   "Style.Cell.Width": "88%",
+   "Style.Cell.FontName": "NJFont-Light",
+   "Style.Cell.Margin": "0 10 10 0",
+   "Style.Cell.Padding": "0 45 0 10",
+   "Style.Cell.FontSize": "14px",
+   "Style.Cell.HideNativeWidgets": "1"
+  },
+  "ParentID": "node1"
+ },
+ {
+  "Type": "Node.FormControls.Label",
+  "ID": "node13",
+  "Name": "If there are no bikes left at this docking station use the app to find a nearby docking station with a bike, and get another release code to use there.",
+  "SortOrder": "12",
+  "TTL": "3600",
+  "Language": "",
+  "TimeStamp": "2020-01-01T00:00:00.0000000Z",
+  "CommonChildType": "",
+  "AncestorIDArray": [
+   "node1"
+  ],
+  "TreeMode": "Leaf",
+  "Tags": {
+   "Style.Class": "page_desc2",
+   "Style.Cell.FontName": "NJFont-Light",
+   "Style.Cell.Margin": "35 10 20 10",
+   "Style.Cell.Padding": "0 10 0 10",
+   "Style.Cell.FontSize": "14px",
+   "Style.Cell.TextAlign": "left"
+  },
+  "ParentID": "node1"
+ },
+ {
+  "Type": "Node",
+  "ID": "button_blank_left_bottom",
+  "SortOrder": "13",
+  "TTL": "3600",
+  "Language": "",
+  "TimeStamp": "2020-01-01T00:00:00.0000000Z",
+  "CommonChildType": "",
+  "AncestorIDArray": [
+   "node1"
+  ],
+  "TreeMode": "Leaf",
+  "Tags": {
+   "Style.Class": "button_blank_left_bottom",
+   "Style.Cell.Width": "15%"
+  },
+  "ParentID": "node1"
+ },
+ {
+  "Type": "Node.FormControls.Button",
+  "ID": "planajourney_Monthly",
+  "Name": "Plan a journey from here",
+  "SortOrder": "14",
+  "TTL": "3600",
+  "Language": "",
+  "TimeStamp": "2020-01-01T00:00:00.0000000Z",
+  "CommonChildType": "",
+  "AncestorIDArray": [
+   "node1"
+  ],
+  "TreeMode": "Leaf",
+  "TargetUri": "part://Clients.TfL.GenerateLCHSJourneyPlanForm_v2?poinamestart=River+Street%2C+Clerkenwell&poiidstart=000000",
+  "Tags": {
+   "Style.Class": "button_set page_button1",
+   "Style.Cell.FontName": "NJFont-Medium",
+   "Style.Cell.FontSize": "16px",
+   "Style.Cell.TextAlign": "center",
+   "Style.Cell.BorderWidth": "1px",
+   "Style.Cell.BorderColor": "#EE0000",
+   "Style.Cell.BackgroundBorderRadius": "10%",
+   "Style.Cell.Width": "70%",
+   "Style.Cell.HideNativeWidgets": "1",
+   "Style.Cell.CenterVertically": "1",
+   "Style.Cell.BackgroundColor": "#FFFFFF",
+   "Style.Cell.Margin.BackgroundColor": "#FFFFFF",
+   "Style.Cell.ForegroundColor": "#EE0000",
+   "Style.Cell.Margin": "20 30 30 30"
+  },
+  "ParentID": "node1"
+ },
+ {
+  "Type": "Node",
+  "ID": "button_blank_right_bottom",
+  "SortOrder": "15",
+  "TTL": "3600",
+  "Language": "",
+  "TimeStamp": "2020-01-01T00:00:00.0000000Z",
+  "CommonChildType": "",
+  "AncestorIDArray": [
+   "node1"
+  ],
+  "TreeMode": "Leaf",
+  "Tags": {
+   "Style.Class": "button_blank_right_bottom",
+   "Style.Cell.Width": "15%"
+  },
+  "ParentID": "node1"
+ },
+ {
+  "Type": "Node",
+  "ID": "button_blank_left_bottom3",
+  "SortOrder": "16",
+  "TTL": "3600",
+  "Language": "",
+  "TimeStamp": "2020-01-01T00:00:00.0000000Z",
+  "CommonChildType": "",
+  "AncestorIDArray": [
+   "node1"
+  ],
+  "TreeMode": "Leaf",
+  "Tags": {
+   "Style.Class": "button_blank_left_bottom3",
+   "Style.Cell.Width": "15%"
+  },
+  "ParentID": "node1"
+ },
+ {
+  "Type": "Node.Link",
+  "ID": "pricing_Monthly",
+  "Name": "Pricing",
+  "SortOrder": "17",
+  "TTL": "3600",
+  "Language": "",
+  "TimeStamp": "2020-01-01T00:00:00.0000000Z",
+  "CommonChildType": "",
+  "AncestorIDArray": [
+   "node1"
+  ],
+  "TreeMode": "Leaf",
+  "Uri": "part://Clients.TfL.GenerateLCHSFeeTable?source=inline",
+  "Tags": {
+   "Style.Class": "button_set page_button3",
+   "Style.Cell.FontName": "NJFont-Medium",
+   "Style.Cell.FontSize": "16px",
+   "Style.Cell.TextAlign": "center",
+   "Style.Cell.BorderWidth": "1px",
+   "Style.Cell.BorderColor": "#EE0000",
+   "Style.Cell.BackgroundBorderRadius": "10%",
+   "Style.Cell.Width": "70%",
+   "Style.Cell.HideNativeWidgets": "1",
+   "Style.Cell.CenterVertically": "1",
+   "Style.Cell.BackgroundColor": "#FFFFFF",
+   "Style.Cell.Margin.BackgroundColor": "#FFFFFF",
+   "Style.Cell.ForegroundColor": "#EE0000",
+   "Style.Cell.Margin": "20 30 30 30"
+  },
+  "ParentID": "node1"
+ },
+ {
+  "Type": "Node",
+  "ID": "button_blank_right_bottom3",
+  "SortOrder": "18",
+  "TTL": "3600",
+  "Language": "",
+  "TimeStamp": "2020-01-01T00:00:00.0000000Z",
+  "CommonChildType": "",
+  "AncestorIDArray": [
+   "node1"
+  ],
+  "TreeMode": "Leaf",
+  "Tags": {
+   "Style.Class": "button_blank_right_bottom3",
+   "Style.Cell.Width": "15%"
+  },
+  "ParentID": "node1"
+ },
+ {
+  "Type": "Node",
+  "ID": "button_blank_left_bottom2",
+  "SortOrder": "19",
+  "TTL": "3600",
+  "Language": "",
+  "TimeStamp": "2020-01-01T00:00:00.0000000Z",
+  "CommonChildType": "",
+  "AncestorIDArray": [
+   "node1"
+  ],
+  "TreeMode": "Leaf",
+  "Tags": {
+   "Style.Class": "button_blank_left_bottom2",
+   "Style.Cell.Width": "15%"
+  },
+  "ParentID": "node1"
+ },
+ {
+  "Type": "Node.Link",
+  "ID": "returntohome_Monthly",
+  "Name": "Return to the home page",
+  "SortOrder": "20",
+  "TTL": "3600",
+  "Language": "",
+  "TimeStamp": "2020-01-01T00:00:00.0000000Z",
+  "CommonChildType": "",
+  "AncestorIDArray": [
+   "node1"
+  ],
+  "TreeMode": "Leaf",
+  "Uri": "internal://home",
+  "Tags": {
+   "Style.Class": "button_set page_button2",
+   "Style.Cell.FontName": "NJFont-Medium",
+   "Style.Cell.FontSize": "16px",
+   "Style.Cell.TextAlign": "center",
+   "Style.Cell.BorderWidth": "1px",
+   "Style.Cell.BorderColor": "#EE0000",
+   "Style.Cell.BackgroundBorderRadius": "10%",
+   "Style.Cell.Width": "70%",
+   "Style.Cell.HideNativeWidgets": "1",
+   "Style.Cell.CenterVertically": "1",
+   "Style.Cell.BackgroundColor": "#FFFFFF",
+   "Style.Cell.Margin.BackgroundColor": "#FFFFFF",
+   "Style.Cell.ForegroundColor": "#EE0000",
+   "Style.Cell.Margin": "10 30 30 30"
+  },
+  "ParentID": "node1"
+ },
+ {
+  "Type": "Node",
+  "ID": "button_blank_right_bottom2",
+  "SortOrder": "21",
+  "TTL": "3600",
+  "Language": "",
+  "TimeStamp": "2020-01-01T00:00:00.0000000Z",
+  "CommonChildType": "",
+  "AncestorIDArray": [
+   "node1"
+  ],
+  "TreeMode": "Leaf",
+  "Tags": {
+   "Style.Class": "button_blank_right_bottom2",
+   "Style.Cell.Width": "15%"
+  },
+  "ParentID": "node1"
+ },
+ {
+  "Type": "Node",
+  "ID": "node1_unlockbar",
+  "Name": "Release code 11111 is valid at River Street, Clerkenwell until 09:15",
+  "SortOrder": "-998",
+  "TTL": "3600",
+  "Language": "",
+  "TimeStamp": "2020-01-01T00:00:00.0000000Z",
+  "CommonChildType": "",
+  "AncestorIDArray": [
+   "node1"
+  ],
+  "TreeMode": "Leaf",
+  "Tags": {
+   "Style.Class": "unlockcodebar",
+   "Style.Cell.BackgroundColor": "#000099",
+   "Style.Cell.ForegroundColor": "#FFFFFF",
+   "Style.Cell.Margin": "0",
+   "Style.Cell.Padding": "10 20 10 20",
+   "Style.Cell.FontName": "NJFont-Medium",
+   "Style.Cell.FontSize": "13",
+   "Style.Cell.Subtitle.FontSize": "12",
+   "Style.Cell.PinToTop": "1",
+   "Style.Icon": "http://s3media.corethree.net/clients/tfl/icon_bike.png"
+  },
+  "ParentID": "node1"
+ }
+]

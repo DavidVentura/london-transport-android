@@ -58,4 +58,6 @@ data class MapFeature(
   val summary: String,
   val details: List<DetailRow>,
   val marker: MarkerStyle = MarkerStyle.Dot,
+  /** Set only where a bike can actually be taken out, which is what puts the button on the sheet. */
+  val hire: HireTarget? = null,
 )

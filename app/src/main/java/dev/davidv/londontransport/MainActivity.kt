@@ -9,6 +9,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import dev.davidv.londontransport.ui.CyclesApp
 import dev.davidv.londontransport.ui.CyclesViewModel
+import dev.davidv.londontransport.ui.HireViewModel
 import dev.davidv.londontransport.ui.RoutesViewModel
 import dev.davidv.londontransport.ui.LondonTransportTheme
 
@@ -26,10 +27,17 @@ class MainActivity : ComponentActivity() {
         RoutesViewModel(graph.lineClient, graph.savedLines, graph.routeCache)
       }
     }
+    val hire = viewModelFactory {
+      initializer { HireViewModel(graph.santander, graph.account, graph.activeHire) }
+    }
 
     setContent {
       LondonTransportTheme {
-        CyclesApp(viewModel(factory = cycles), viewModel(factory = routes))
+        CyclesApp(
+          viewModel(factory = cycles),
+          viewModel(factory = routes),
+          viewModel(factory = hire),
+        )
       }
     }
   }

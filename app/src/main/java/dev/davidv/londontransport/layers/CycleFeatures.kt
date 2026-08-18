@@ -4,8 +4,10 @@ import dev.davidv.londontransport.domain.AvailabilityLevel
 import dev.davidv.londontransport.domain.DetailRow
 import dev.davidv.londontransport.domain.FeatureId
 import dev.davidv.londontransport.domain.FeatureKey
+import dev.davidv.londontransport.domain.HireTarget
 import dev.davidv.londontransport.domain.LayerId
 import dev.davidv.londontransport.domain.MapFeature
+import dev.davidv.londontransport.domain.PointName
 import dev.davidv.londontransport.domain.Station
 import dev.davidv.londontransport.domain.StationState
 import dev.davidv.londontransport.domain.StationStatus
@@ -21,7 +23,18 @@ fun stationFeature(station: Station): MapFeature =
     badge = badge(station.status),
     summary = summary(station.status),
     details = details(station.status),
+    hire = hireTarget(station),
   )
+
+/**
+ * A dock that is locked or gone cannot hand out a bike, so it gets no button. A dock read back from
+ * the cache still can: the counts are unknown, not the dock.
+ */
+private fun hireTarget(station: Station): HireTarget? {
+  val status = station.status
+  if (status is StationStatus.Live && status.state != StationState.OPERATIONAL) return null
+  return HireTarget(terminal = station.terminal, point = PointName(station.name))
+}
 
 private fun level(status: StationStatus): AvailabilityLevel =
   when (status) {
