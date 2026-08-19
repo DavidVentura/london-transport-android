@@ -8,6 +8,12 @@
 
     <uses-feature android:name="android.hardware.location.gps" android:required="false" />
 
+    <!-- A broadcast has to name its target package to reach a manifest receiver, and
+         naming one is only allowed for packages listed here. -->
+    <queries>
+        <package android:name="dev.davidv.withoutings" />
+    </queries>
+
     <application
         android:name=".CyclesApplication"
         android:allowBackup="true"

@@ -13,11 +13,13 @@ import dev.davidv.londontransport.domain.LayerId
 import dev.davidv.londontransport.domain.PointName
 import dev.davidv.londontransport.domain.ReleaseCode
 import dev.davidv.londontransport.domain.TerminalName
+import dev.davidv.londontransport.domain.WorkoutSignal
 import dev.davidv.londontransport.santander.AuthToken
 import dev.davidv.londontransport.santander.Credentials
 import dev.davidv.londontransport.santander.HireCode
 import dev.davidv.londontransport.santander.HireResult
 import dev.davidv.londontransport.santander.LoginResult
+import dev.davidv.londontransport.santander.Password
 import dev.davidv.londontransport.santander.SantanderApi
 import dev.davidv.londontransport.santander.SmsChallenge
 import dev.davidv.londontransport.santander.UserNodeId
@@ -66,6 +68,8 @@ private val CHALLENGE =
 
 private val CREDENTIALS = Credentials(UserNodeId("node"), AuthToken("token"))
 
+private val FRESH_CREDENTIALS = Credentials(UserNodeId("node"), AuthToken("second-token"))
+
 private val NOW: Instant = Instant.parse("2026-08-18T21:28:26Z")
 
 /** Answers whatever the test lines up, and remembers what it was asked. */
@@ -82,7 +86,7 @@ private class FakeApi(
 
   fun willVerify(vararg results: VerifyResult) = apply { verifications += results }
 
-  override suspend fun login(email: String, password: String): LoginResult {
+  override suspend fun login(email: String, password: Password): LoginResult {
     calls += "login($email)"
     return logins.removeFirst()
   }
@@ -103,6 +107,16 @@ private class FakeApi(
   ): VerifyResult {
     calls += "verify($digits)"
     return verifications.removeFirst()
+  }
+}
+
+/** Stands in for whatever tracks workouts on the phone. */
+private class FakeWorkouts : WorkoutSignal {
+  var starts = 0
+    private set
+
+  override fun cyclingStarted() {
+    starts += 1
   }
 }
 
@@ -134,8 +148,10 @@ class HireViewModelTest {
   private fun viewModel(
     api: SantanderApi,
     stores: Pair<AccountStore, ActiveHireStore>,
+    workouts: WorkoutSignal = FakeWorkouts(),
     now: Instant = NOW,
-  ) = HireViewModel(api, stores.first, stores.second, Clock.fixed(now, ZoneOffset.UTC))
+  ) =
+    HireViewModel(api, stores.first, stores.second, workouts, Clock.fixed(now, ZoneOffset.UTC))
 
   /**
    * The stores write to a real file off the test dispatcher, so every step that saves lands a beat
@@ -154,7 +170,10 @@ class HireViewModelTest {
 
     model.rent(REQUEST)
 
-    assertEquals(HireFlow.Login(REQUEST, busy = false, error = null), model.state.value.flow)
+    assertEquals(
+      HireFlow.Login(REQUEST, email = "", busy = false, error = null),
+      model.state.value.flow,
+    )
     assertEquals(emptyList<String>(), api.calls)
   }
 
@@ -301,5 +320,156 @@ class HireViewModelTest {
 
     assertNull(model.settled { true }.active)
     assertNull(stores.second.hire.first { it == null })
+  }
+
+  @Test
+  fun `releasing a bike says a ride has started, once`() = runTest {
+    val workouts = FakeWorkouts()
+    val api = FakeApi().willLogin(LoginResult.Success(CREDENTIALS)).willHire(released())
+    val model = viewModel(api, stores(backgroundScope), workouts)
+
+    model.rent(REQUEST)
+    model.submitLogin("rider@example.com", "hunter2")
+    model.settled { it.account != null }
+    model.rent(REQUEST)
+    model.settled { it.active != null }
+
+    assertEquals(1, workouts.starts)
+  }
+
+  @Test
+  fun `a dock that refuses starts no ride`() = runTest {
+    val workouts = FakeWorkouts()
+    val api =
+      FakeApi()
+        .willLogin(LoginResult.Success(CREDENTIALS))
+        .willHire(HireResult.Refused("Sorry, but there are no bikes available at this location."))
+    val model = viewModel(api, stores(backgroundScope), workouts)
+
+    model.rent(REQUEST)
+    model.submitLogin("rider@example.com", "hunter2")
+    model.settled { it.account != null }
+    model.rent(REQUEST)
+    model.settled { it.flow is HireFlow.Failed }
+
+    assertEquals(0, workouts.starts)
+  }
+
+  @Test
+  fun `a code still held from an earlier run does not start the ride again`() = runTest {
+    val workouts = FakeWorkouts()
+    val stores = stores(backgroundScope)
+    stores.second.save(
+      ActiveHire(
+        station = STATION,
+        stationName = "River Street, Clerkenwell",
+        code = ReleaseCode("13212"),
+        expiresAt = NOW.plusSeconds(600),
+      )
+    )
+
+    val model = viewModel(FakeApi(), stores, workouts)
+    model.settled { it.active != null }
+
+    assertEquals(0, workouts.starts)
+  }
+
+  @Test
+  fun `a token the backend has dropped is replaced from the saved password, in one tap`() =
+    runTest {
+      val api =
+        FakeApi()
+          .willLogin(LoginResult.Success(CREDENTIALS), LoginResult.Success(FRESH_CREDENTIALS))
+          .willHire(HireResult.LoggedOut, released())
+      val stores = stores(backgroundScope)
+      val model = viewModel(api, stores)
+
+      model.rent(REQUEST)
+      model.submitLogin("rider@example.com", "hunter2")
+      model.settled { it.account != null }
+      model.rent(REQUEST)
+
+      val state = model.settled { it.active != null }
+      assertEquals(
+        listOf(
+          "login(rider@example.com)",
+          "hire(001023)",
+          "login(rider@example.com)",
+          "hire(001023)",
+        ),
+        api.calls,
+      )
+      assertEquals(HireFlow.Idle, state.flow)
+      assertEquals(ReleaseCode("13212"), state.active?.code)
+      assertEquals(
+        Password("hunter2"),
+        stores.first.account.first { it?.credentials == FRESH_CREDENTIALS }?.password,
+      )
+    }
+
+  @Test
+  fun `a password the backend no longer accepts puts the login form back, with the email in it`() =
+    runTest {
+      val api =
+        FakeApi()
+          .willLogin(
+            LoginResult.Success(CREDENTIALS),
+            LoginResult.Rejected("Those details were not accepted."),
+          )
+          .willHire(HireResult.LoggedOut)
+      val model = viewModel(api, stores(backgroundScope))
+
+      model.rent(REQUEST)
+      model.submitLogin("rider@example.com", "hunter2")
+      model.settled { it.account != null }
+      model.rent(REQUEST)
+
+      val flow = model.settled { it.flow is HireFlow.Login }.flow as HireFlow.Login
+      assertEquals("rider@example.com", flow.email)
+      assertEquals("Those details were not accepted.", flow.error)
+      assertEquals(REQUEST, flow.request)
+    }
+
+  @Test
+  fun `being logged out again straight after logging in stops asking and hands over the form`() =
+    runTest {
+      val workouts = FakeWorkouts()
+      val api =
+        FakeApi()
+          .willLogin(LoginResult.Success(CREDENTIALS), LoginResult.Success(FRESH_CREDENTIALS))
+          .willHire(HireResult.LoggedOut, HireResult.LoggedOut)
+      val model = viewModel(api, stores(backgroundScope), workouts)
+
+      model.rent(REQUEST)
+      model.submitLogin("rider@example.com", "hunter2")
+      model.settled { it.account != null }
+      model.rent(REQUEST)
+
+      val flow = model.settled { it.flow is HireFlow.Login }.flow as HireFlow.Login
+      assertEquals("rider@example.com", flow.email)
+      assertTrue(flow.error!!.contains("logged this device out"))
+      assertEquals(2, api.calls.count { it == "hire(001023)" })
+      assertEquals(0, workouts.starts)
+    }
+
+  @Test
+  fun `losing the session while verifying asks for the login rather than the digits`() = runTest {
+    val api =
+      FakeApi()
+        .willLogin(LoginResult.Success(CREDENTIALS))
+        .willHire(HireResult.VerificationNeeded(CHALLENGE))
+        .willVerify(VerifyResult.LoggedOut)
+    val model = viewModel(api, stores(backgroundScope))
+
+    model.rent(REQUEST)
+    model.submitLogin("rider@example.com", "hunter2")
+    model.settled { it.account != null }
+    model.rent(REQUEST)
+    model.settled { it.flow is HireFlow.Verify }
+    model.submitVerification("42")
+
+    val flow = model.settled { it.flow is HireFlow.Login }.flow as HireFlow.Login
+    assertEquals("rider@example.com", flow.email)
+    assertEquals(REQUEST, flow.request)
   }
 }

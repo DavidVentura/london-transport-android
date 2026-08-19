@@ -247,6 +247,7 @@ fun CyclesApp(
       ) {
         LoginSheet(
           stationName = flow.request.stationName,
+          knownEmail = flow.email,
           busy = flow.busy,
           error = flow.error,
           onSubmit = hireViewModel::submitLogin,

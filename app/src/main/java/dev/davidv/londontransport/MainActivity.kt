@@ -28,7 +28,9 @@ class MainActivity : ComponentActivity() {
       }
     }
     val hire = viewModelFactory {
-      initializer { HireViewModel(graph.santander, graph.account, graph.activeHire) }
+      initializer {
+        HireViewModel(graph.santander, graph.account, graph.activeHire, graph.workouts)
+      }
     }
 
     setContent {

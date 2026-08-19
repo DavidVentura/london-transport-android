@@ -28,6 +28,9 @@ sealed interface HireResult {
 
   data class Refused(val message: String) : HireResult
 
+  /** The stored token is no longer accepted; nothing but a fresh login gets past this. */
+  data object LoggedOut : HireResult
+
   data class Unavailable(val reason: String) : HireResult
 }
 
@@ -35,6 +38,8 @@ sealed interface VerifyResult {
   data object Verified : VerifyResult
 
   data class Rejected(val message: String) : VerifyResult
+
+  data object LoggedOut : VerifyResult
 
   data class Unavailable(val reason: String) : VerifyResult
 }
@@ -45,7 +50,7 @@ sealed interface VerifyResult {
  * this interface.
  */
 interface SantanderApi {
-  suspend fun login(email: String, password: String): LoginResult
+  suspend fun login(email: String, password: Password): LoginResult
 
   /** Releases a physical bike. There is no cancel: a [HireResult.Released] is already a charge. */
   suspend fun hire(credentials: Credentials, terminal: TerminalName, point: PointName): HireResult
@@ -72,14 +77,14 @@ class SantanderClient(
   private val base: String = SANTANDER_BASE,
 ) : SantanderApi {
 
-  override suspend fun login(email: String, password: String): LoginResult {
+  override suspend fun login(email: String, password: Password): LoginResult {
     val page =
       post(
         url(
           PROCESS_LOGIN,
           mapOf("terminal" to "", "terminalname" to "", "navigateBackToID" to ""),
         ),
-        controlVals = mapOf("login_email" to email, "login_password" to password),
+        controlVals = mapOf("login_email" to email, "login_password" to password.value),
       )
     val nodes =
       when (page) {
@@ -111,8 +116,8 @@ class SantanderClient(
     val begun = post(url(BEGIN_HIRE, mapOf("TerminalName" to terminal.value)), credentials)
     when (begun) {
       is Reply.Failed -> return HireResult.Unavailable(begun.reason)
-      is Reply.Refused -> return HireResult.Refused(begun.message)
-      is Reply.Page -> simpleResponse(begun.nodes)?.let { return HireResult.Refused(it) }
+      is Reply.Refused -> return refusedHire(begun.message)
+      is Reply.Page -> simpleResponse(begun.nodes)?.let { return refusedHire(it) }
     }
 
     val confirmed =
@@ -130,12 +135,12 @@ class SantanderClient(
       )
     return when (confirmed) {
       is Reply.Failed -> HireResult.Unavailable(confirmed.reason)
-      is Reply.Refused -> HireResult.Refused(confirmed.message)
+      is Reply.Refused -> refusedHire(confirmed.message)
       is Reply.Page ->
         when (val page = parseHirePage(confirmed.nodes)) {
           is HirePage.Released -> HireResult.Released(page.code)
           is HirePage.VerificationNeeded -> HireResult.VerificationNeeded(page.challenge)
-          is HirePage.Refused -> HireResult.Refused(page.message)
+          is HirePage.Refused -> refusedHire(page.message)
           is HirePage.Malformed -> HireResult.Unavailable(page.reason)
         }
     }
@@ -158,12 +163,18 @@ class SantanderClient(
       )
     return when (reply) {
       is Reply.Failed -> VerifyResult.Unavailable(reply.reason)
-      is Reply.Refused -> VerifyResult.Rejected(reply.message)
+      is Reply.Refused -> rejectedVerification(reply.message)
       is Reply.Page ->
         if (deviceVerified(reply.nodes)) VerifyResult.Verified
-        else VerifyResult.Rejected(simpleResponse(reply.nodes) ?: "That code was not accepted.")
+        else rejectedVerification(simpleResponse(reply.nodes) ?: "That code was not accepted.")
     }
   }
+
+  private fun refusedHire(message: String): HireResult =
+    if (loggedOut(message)) HireResult.LoggedOut else HireResult.Refused(message)
+
+  private fun rejectedVerification(message: String): VerifyResult =
+    if (loggedOut(message)) VerifyResult.LoggedOut else VerifyResult.Rejected(message)
 
   private sealed interface Reply {
     data class Page(val nodes: List<Node>) : Reply

@@ -23,10 +23,19 @@ private const val VERIFICATION_FLAG = "encryptionverificationcheck"
 
 @JvmInline value class AuthToken(val value: String)
 
-/** The whole credential — there is no cookie and no expiry, so this is what gets persisted. */
+@JvmInline
+value class Password(val value: String) {
+  override fun toString(): String = "Password(hidden)"
+}
+
+/** What the backend accepts on a call; it carries no expiry, and dies without warning. */
 data class Credentials(val user: UserNodeId, val token: AuthToken)
 
-data class Account(val email: String, val credentials: Credentials)
+/**
+ * Everything needed to act as the rider, including what it takes to earn a new token once the
+ * stored one stops being accepted.
+ */
+data class Account(val email: String, val password: Password, val credentials: Credentials)
 
 /** `part://Clients.TfL.X.Y?q=1` -> `<base>Clients/TfL/X/Y?q=1`; dots become slashes in the path only. */
 fun partUriToUrl(partUri: String, base: String = SANTANDER_BASE): String {

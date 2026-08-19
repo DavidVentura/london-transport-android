@@ -18,6 +18,7 @@ import dev.davidv.londontransport.data.StationCache
 import dev.davidv.londontransport.data.TFL_BIKEPOINT_ENDPOINT
 import dev.davidv.londontransport.data.TflBikePointClient
 import dev.davidv.londontransport.layers.CycleHireLayer
+import dev.davidv.londontransport.ipc.WorkoutBroadcast
 import dev.davidv.londontransport.layers.MapLayer
 import dev.davidv.londontransport.map.configureOsmdroid
 import dev.davidv.londontransport.santander.DeviceId
@@ -90,6 +91,8 @@ class AppGraph(context: Context) {
         context.preferencesDataStoreFile("hire")
       }
     )
+
+  val workouts = WorkoutBroadcast(context)
 
   /**
    * The hire backend trusts a device id once it has been verified by SMS, so this has to be the same

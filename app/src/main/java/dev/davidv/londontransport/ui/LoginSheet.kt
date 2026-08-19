@@ -30,11 +30,12 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun LoginSheet(
   stationName: String,
+  knownEmail: String,
   busy: Boolean,
   error: String?,
   onSubmit: (String, String) -> Unit,
 ) {
-  var email by rememberSaveable { mutableStateOf("") }
+  var email by rememberSaveable { mutableStateOf(knownEmail) }
   var password by rememberSaveable { mutableStateOf("") }
   val complete = email.isNotBlank() && password.isNotBlank()
 

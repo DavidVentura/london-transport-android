@@ -52,6 +52,14 @@ fun parseNodeReply(body: String): NodeReply {
   return NodeReply.Nodes(nodes)
 }
 
+private val SESSION_GONE = Regex("logged out|log ?in again", RegexOption.IGNORE_CASE)
+
+/**
+ * The backend reports a dead token in the same shape as every other refusal, so the wording is all
+ * there is to separate "log in again" from "no bikes here".
+ */
+fun loggedOut(message: String): Boolean = SESSION_GONE.containsMatchIn(message)
+
 /** The lone sentence of a [SIMPLE_RESPONSE_NODE] reply, or null when the reply is a real page. */
 fun simpleResponse(nodes: List<Node>): String? =
   nodes.singleOrNull()?.takeIf { it.type == SIMPLE_RESPONSE_NODE }?.name

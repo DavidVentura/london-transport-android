@@ -5,6 +5,7 @@ import dev.davidv.londontransport.santander.Credentials
 import dev.davidv.londontransport.santander.NodeReply
 import dev.davidv.londontransport.santander.UserNodeId
 import dev.davidv.londontransport.santander.encryptControlVals
+import dev.davidv.londontransport.santander.loggedOut
 import dev.davidv.londontransport.santander.partUriToUrl
 import dev.davidv.londontransport.santander.parseNodeReply
 import dev.davidv.londontransport.santander.userAuthHeader
@@ -13,6 +14,7 @@ import javax.crypto.Cipher
 import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -80,6 +82,14 @@ class SantanderProtocolTest {
       parseNodeReply("""[{"Type":"Node.Internal.Error","ID":"x","Name":"Please log in again"}]""")
 
     assertEquals(NodeReply.Rejected("Please log in again"), reply)
+  }
+
+  @Test
+  fun `the refusals that mean the token is dead are told apart from the ones that do not`() {
+    assertTrue(loggedOut("You have been logged out"))
+    assertTrue(loggedOut("Please log in again"))
+    assertFalse(loggedOut("Sorry, but there are no bikes available at this location."))
+    assertFalse(loggedOut("You already have a bike out."))
   }
 
   @Test
