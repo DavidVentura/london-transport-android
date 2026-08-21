@@ -7,6 +7,7 @@ plugins {
 android {
   namespace = "dev.davidv.londontransport"
   compileSdk = 36
+  buildToolsVersion = "36.0.0"
 
   defaultConfig {
     applicationId = "dev.davidv.londontransport"
@@ -15,6 +16,13 @@ android {
     versionCode = 1
     versionName = "0.1.0"
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+  }
+
+  // The dependency metadata block AGP appends is encrypted with a Google key, which makes the APK
+  // impossible to reproduce byte-for-byte.
+  dependenciesInfo {
+    includeInApk = false
+    includeInBundle = false
   }
 
   buildTypes {
