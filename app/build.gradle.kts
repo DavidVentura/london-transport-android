@@ -4,6 +4,20 @@ plugins {
   alias(libs.plugins.kotlin.serialization)
 }
 
+// Set LONDON_TRANSPORT_KEYSTORE to sign local builds with the release key. The password is read
+// from ~/.gradle/gradle.properties rather than the environment, which every child process can read.
+val devKeystore: String? = System.getenv("LONDON_TRANSPORT_KEYSTORE")
+val devKeystorePassword: String? =
+  providers.gradleProperty("londonTransportKeystorePassword").orNull
+    ?: if (devKeystore == null) {
+      null
+    } else {
+      throw GradleException(
+        "LONDON_TRANSPORT_KEYSTORE is set but londonTransportKeystorePassword is not; " +
+          "add it to ~/.gradle/gradle.properties, or unset the variable to sign with the debug key"
+      )
+    }
+
 android {
   namespace = "dev.davidv.londontransport"
   compileSdk = 36
@@ -25,7 +39,28 @@ android {
     includeInBundle = false
   }
 
+  // Signing the debug build with the release key keeps a single install on the phone: with two
+  // different keys, moving between a local build and a published APK means uninstalling, which
+  // takes the saved pins, lines and login with it.
+  signingConfigs {
+    if (devKeystore != null) {
+      create("dev") {
+        storeFile = file(devKeystore)
+        storePassword = devKeystorePassword
+        keyAlias = "key0"
+        // PKCS12 holds one password for the store and the key alike.
+        keyPassword = devKeystorePassword
+      }
+    }
+  }
+
   buildTypes {
+    debug {
+      if (devKeystore != null) {
+        signingConfig = signingConfigs.getByName("dev")
+      }
+    }
+
     release {
       isMinifyEnabled = true
       isShrinkResources = true
