@@ -43,9 +43,10 @@ class CycleFeaturesTest {
   }
 
   @Test
-  fun `the badge counts bikes against the whole stand`() {
-    assertEquals("5/20", stationFeature(station(3, 2)).badge)
-    assertEquals("0/20", stationFeature(station(0)).badge)
+  fun `the badge counts bikes against the docks you can actually park in`() {
+    assertEquals("5/5", stationFeature(station(3, 2)).badge)
+    assertEquals("0/5", stationFeature(station(0)).badge)
+    assertEquals("3/0", stationFeature(station(3, emptyDocks = 0)).badge)
   }
 
   @Test

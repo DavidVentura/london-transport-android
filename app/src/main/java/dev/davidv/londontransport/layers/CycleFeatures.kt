@@ -49,12 +49,15 @@ private fun level(status: StationStatus): AvailabilityLevel =
       }
   }
 
-/** Bikes over docks rather than bikes alone, so a full stand reads as one you cannot park at. */
+/**
+ * Bikes over free docks, not over the whole stand: a broken dock is counted in the capacity but
+ * cannot be parked at, so only the empty count answers "can I leave a bike here".
+ */
 private fun badge(status: StationStatus): String =
   when (status) {
     StationStatus.Unknown -> "?"
     is StationStatus.Live ->
-      if (status.state == StationState.OPERATIONAL) "${status.bikes.total}/${status.capacity}"
+      if (status.state == StationState.OPERATIONAL) "${status.bikes.total}/${status.emptyDocks}"
       else "—"
   }
 
