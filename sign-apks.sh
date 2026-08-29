@@ -39,19 +39,19 @@ fi
 
 VERSION_NAME=$("$BUILD_TOOLS/aapt2" dump badging "$unsigned_apk" | grep -oP "versionName='\K[^']*")
 signed_apk="signed/london-transport-${VERSION_NAME}.apk"
-aligned_apk="unsigned/app-release-aligned.apk"
 
 mkdir -p signed
-rm -f "$aligned_apk" "$signed_apk"
-"$BUILD_TOOLS/zipalign" -p 4 "$unsigned_apk" "$aligned_apk"
+rm -f "$signed_apk"
+
+# For some reason --alignment-preserved is required to be reproducible vs F-Droid
 "$BUILD_TOOLS/apksigner" sign \
+    --alignment-preserved \
     --ks "$KEYSTORE_PATH" \
     --ks-pass pass:"$STORE_PASSWORD" \
     --ks-key-alias "$KEY_ALIAS" \
     --key-pass pass:"$KEY_PASSWORD" \
     --out "$signed_apk" \
-    "$aligned_apk"
-rm -f "$aligned_apk"
+    "$unsigned_apk"
 
 "$BUILD_TOOLS/apksigner" verify --print-certs "$signed_apk" | grep -i "signer #1 certificate SHA-256"
 echo "Signed: $signed_apk"
