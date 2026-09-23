@@ -29,10 +29,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
 import dev.davidv.londontransport.santander.SmsChallenge
 
-/**
- * The one-off check on a device the account has not seen before. It only closes on the cross: a
- * stray tap outside would drop the SMS the rider is in the middle of reading.
- */
+/** Only closes on the cross: a stray tap outside would drop the SMS the rider is reading. */
 @Composable
 fun VerifyDialog(
   challenge: SmsChallenge,

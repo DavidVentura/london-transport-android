@@ -23,7 +23,6 @@ data class FeatureKey(val layer: LayerId, val feature: FeatureId) {
   }
 }
 
-/** How well stocked a feature is, on a scale the map palette and the list share. */
 enum class AvailabilityLevel {
   UNKNOWN,
   NONE,
@@ -35,8 +34,6 @@ enum class AvailabilityLevel {
 
 data class DetailRow(val label: String, val value: String)
 
-/** How a feature is drawn: live data as a dot, a hand-placed marker as a pin, a bus stop as a
- * small ring in its line's colour. */
 sealed interface MarkerStyle {
   data object Dot : MarkerStyle
 
@@ -45,10 +42,6 @@ sealed interface MarkerStyle {
   data class Stop(val line: LineId, val kind: TransportKind) : MarkerStyle
 }
 
-/**
- * The only shape the map and the favourites list understand. Every layer flattens its own domain
- * objects into these, so neither screen knows what a docking station is.
- */
 data class MapFeature(
   val key: FeatureKey,
   val position: LatLon,
@@ -58,6 +51,5 @@ data class MapFeature(
   val summary: String,
   val details: List<DetailRow>,
   val marker: MarkerStyle = MarkerStyle.Dot,
-  /** Set only where a bike can actually be taken out, which is what puts the button on the sheet. */
   val hire: HireTarget? = null,
 )

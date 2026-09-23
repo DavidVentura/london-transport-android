@@ -36,7 +36,6 @@ private data class CachedStop(
   val letter: String? = null,
 )
 
-/** A route as last seen, with when that was — a line only needs asking about a few times a day. */
 data class HeldRoute(val path: RoutePath, val fetchedAt: Instant)
 
 sealed interface RouteCacheRead {
@@ -47,17 +46,12 @@ sealed interface RouteCacheRead {
   data class Unreadable(val reason: String) : RouteCacheRead
 }
 
-/** What writing a route did to the copy already on disk. */
 enum class RouteChange {
   FIRST_SEEN,
   UNCHANGED,
   MOVED,
 }
 
-/**
- * Holds every saved route so the map draws without the network, and — because TfL edits diversions
- * straight into the published route with no flag on them — so a route that moves can be noticed.
- */
 class RouteCache(private val file: File) {
   private val json = Json
 

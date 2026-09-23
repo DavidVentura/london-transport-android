@@ -11,7 +11,6 @@ const val SANTANDER_BASE = "https://ce-a24.corethree.net/"
 /** Sent as a body field on every call; the backend routes on it rather than on the Host header. */
 const val REMOTE_HOST = "ce.corethree.net"
 
-// Lifted verbatim from the shipped app (zd/a.java), where the IV is the key's first 16 bytes.
 private val CONTROL_VALS_KEY: ByteArray =
   Base64.getDecoder().decode("diS1dUbsVQyWSRA5zhAbKJrxYmLa7hD5CVUWc4OZaRs=")
 
@@ -28,13 +27,8 @@ value class Password(val value: String) {
   override fun toString(): String = "Password(hidden)"
 }
 
-/** What the backend accepts on a call; it carries no expiry, and dies without warning. */
 data class Credentials(val user: UserNodeId, val token: AuthToken)
 
-/**
- * Everything needed to act as the rider, including what it takes to earn a new token once the
- * stored one stops being accepted.
- */
 data class Account(val email: String, val password: Password, val credentials: Credentials)
 
 /** `part://Clients.TfL.X.Y?q=1` -> `<base>Clients/TfL/X/Y?q=1`; dots become slashes in the path only. */
@@ -55,11 +49,7 @@ fun userAuthHeader(credentials: Credentials): String {
   return digest.joinToString("") { "%02x".format(it) } + "|" + credentials.user.value
 }
 
-/**
- * Passwords and SMS digits travel as `c3-controlvals`: the form joined as `k=v&k=v`, AES-256-CBC
- * encrypted under the app's static key, base64'd. The server checks the injected flag to know the
- * payload decrypted correctly.
- */
+/** The server checks the injected flag to know the payload decrypted correctly. */
 fun encryptControlVals(fields: Map<String, String>): String {
   val form =
     (fields + (VERIFICATION_FLAG to "1"))

@@ -102,9 +102,8 @@ class CyclesViewModel(
   }
 
   /**
-   * Opens on whatever the user saved rather than on central London, once, before they have touched
-   * the map. Waits for both stores and for the first load to settle, otherwise the frame would
-   * depend on which of them answered first.
+   * Waits for both stores and for the first load to settle, otherwise the frame would depend on
+   * which of them answered first.
    */
   private suspend fun fitToSavedPlaces() {
     val starred = favourites.favourites.first()

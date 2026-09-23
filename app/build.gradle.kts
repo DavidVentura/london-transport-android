@@ -4,8 +4,8 @@ plugins {
   alias(libs.plugins.kotlin.serialization)
 }
 
-// Set LONDON_TRANSPORT_KEYSTORE to sign local builds with the release key. The password is read
-// from ~/.gradle/gradle.properties rather than the environment, which every child process can read.
+// The keystore password is read from ~/.gradle/gradle.properties rather than the environment,
+// which every child process can read.
 val devKeystore: String? = System.getenv("LONDON_TRANSPORT_KEYSTORE")
 val devKeystorePassword: String? =
   providers.gradleProperty("londonTransportKeystorePassword").orNull

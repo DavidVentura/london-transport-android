@@ -30,7 +30,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import okhttp3.OkHttpClient
 
-/** Everything with a lifetime longer than an Activity, wired once at startup. */
 class AppGraph(context: Context) {
   private val storeScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -96,7 +95,7 @@ class AppGraph(context: Context) {
 
   /**
    * The hire backend trusts a device id once it has been verified by SMS, so this has to be the same
-   * string on every run. ANDROID_ID is exactly that, and it is what the official app sends.
+   * string on every run.
    */
   private val deviceId =
     DeviceId(

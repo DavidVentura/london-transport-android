@@ -8,10 +8,7 @@ import android.graphics.Path
 
 private const val BLUE = 0xFF1A73E8.toInt()
 
-/**
- * osmdroid ships a grey arrow and a grey figure. Everyone expects the blue dot, so we draw our own
- * rather than teaching people a new symbol.
- */
+/** osmdroid ships a grey arrow and a grey figure; people expect the blue dot. */
 fun personMarker(density: Float): Bitmap {
   val radius = 9f * density
   val ring = 3f * density
@@ -37,7 +34,6 @@ fun personMarker(density: Float): Bitmap {
   return bitmap
 }
 
-/** Drawn in place of the dot once a bearing is known; osmdroid rotates it to face the way you go. */
 fun directionMarker(density: Float): Bitmap {
   val half = 13f * density
   val size = (half * 2).toInt()

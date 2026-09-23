@@ -12,7 +12,6 @@ import java.time.Instant
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
-/** Survives the app being killed on the walk from phone to dock. */
 class ActiveHireStore(private val store: DataStore<Preferences>) {
   val hire: Flow<ActiveHire?> =
     store.data.map { preferences ->

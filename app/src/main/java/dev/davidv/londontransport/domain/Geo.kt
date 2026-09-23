@@ -6,10 +6,6 @@ data class MapCamera(val center: LatLon, val zoom: Double)
 
 data class GeoBounds(val south: Double, val west: Double, val north: Double, val east: Double)
 
-/**
- * The box the given points sit in, grown by [padding] of its own span on every side. Null when
- * there is nothing to frame.
- */
 fun boundsAround(points: List<LatLon>, padding: Double): GeoBounds? {
   if (points.isEmpty()) return null
 

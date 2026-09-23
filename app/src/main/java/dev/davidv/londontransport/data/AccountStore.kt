@@ -13,9 +13,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
 /**
- * The login, kept whole. The token is what every call runs on, and the password is what earns a new
- * one when the backend drops the old one mid-ride, which it does without warning. A login stored
- * before the password was kept reads back as no account at all, so it is asked for once more.
+ * The password is kept to earn a new token when the backend drops the old one mid-ride. A login
+ * stored before the password was kept reads back as no account at all, so it is asked for again.
  */
 class AccountStore(private val store: DataStore<Preferences>) {
   val account: Flow<Account?> =

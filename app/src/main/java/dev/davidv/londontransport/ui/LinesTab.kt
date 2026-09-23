@@ -123,7 +123,6 @@ fun LinesTab(
   }
 }
 
-/** Fixed width per kind so the rows line up; a long line name shrinks rather than wraps. */
 @Composable
 private fun LinePill(route: SavedRoute) {
   Surface(

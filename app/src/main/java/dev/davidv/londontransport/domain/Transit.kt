@@ -6,10 +6,6 @@ value class LineId(val value: String)
 @JvmInline
 value class StopId(val value: String)
 
-/**
- * What the map can be asked to show. [BIKE] is the docking station layer; the other two are lines
- * you save. Only [BUS] and [TUBE] ever reach a [TransitLine] — nothing publishes a bike route.
- */
 enum class TransportKind {
   BIKE,
   BUS,
@@ -18,8 +14,6 @@ enum class TransportKind {
 
 data class TransitLine(val id: LineId, val name: String, val kind: TransportKind)
 
-/** Docking stations are worth seeing either everywhere or only where you park, so they get a
- * third setting the line layers do not need. */
 enum class BikeDisplay {
   NONE,
   FAVOURITES,
@@ -37,14 +31,13 @@ data class RouteStop(
   val id: StopId,
   val name: String,
   val position: LatLon,
-  /** The letter on the flag at the kerb, which is how you find the stop. Tube stops have none. */
   val letter: String?,
 )
 
 /**
- * TfL publishes the route it is running today, so a long-lived diversion arrives here as an
- * ordinary path with nothing marking it as temporary. Comparing against the copy on disk is the
- * only signal that a route moved.
+ * TfL publishes the route it is running today, so a long-lived diversion arrives as an ordinary
+ * path with nothing marking it as temporary. Comparing against the copy on disk is the only signal
+ * that a route moved.
  */
 data class RoutePath(
   val line: LineId,
@@ -54,7 +47,6 @@ data class RoutePath(
   val stops: List<RouteStop>,
 )
 
-/** A line the user keeps: which way round they care about, and whether it is on the map. */
 data class SavedLine(
   val id: LineId,
   val kind: TransportKind,

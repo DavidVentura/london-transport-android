@@ -27,7 +27,6 @@ class SettingsStore(private val store: DataStore<Preferences>) {
     store.edit { preferences -> preferences[BIKE_DISPLAY] = display.name }
   }
 
-  /** Everything is on the map until it is switched off. */
   val hiddenKinds: Flow<Set<TransportKind>> =
     store.data.map { preferences ->
       preferences[HIDDEN_KINDS].orEmpty().map(TransportKind::valueOf).toSet()

@@ -14,10 +14,7 @@ import dev.davidv.londontransport.domain.TransportKind
 
 val BUS_STOP_LAYER = LayerId("bus-stops")
 
-/**
- * One stop of one saved route. The same kerb serves several lines, so the line is part of the key —
- * two saved routes through the same stop are two features, each answering for its own line.
- */
+/** The same kerb serves several lines, so the line is part of the key. */
 fun busStopFeature(
   stop: RouteStop,
   route: RoutePath,

@@ -14,10 +14,7 @@ enum class StationState {
   NOT_INSTALLED,
 }
 
-/**
- * A station read back from the cache knows where it is and nothing else — dock counts only ever
- * come from a live fetch, so there is no shape of [Station] that can carry a stale count.
- */
+/** Counts only ever come from a live fetch: a count read back from the cache would be stale. */
 sealed interface StationStatus {
   data class Live(
     val bikes: BikeCounts,

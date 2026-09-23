@@ -1,9 +1,6 @@
 """
 Client for the Santander Cycles (TfL Cycle Hire) backend.
 
-Reverse-engineered from uk.gov.tfl.cyclehire v10.1.006; there is no public API,
-so the hosts and static keys below come from the shipped APK and may change.
-
 The backend is Corethree's "node" platform: an action is a POST to a node URI,
 and each endpoint returns its own fixed shape — a flatjson array of nodes or a
 bare JSON object. Every endpoint parses its own shape at the boundary.
@@ -23,10 +20,9 @@ import requests
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad
 
-BASE_URL = "https://ce-a24.corethree.net/"  # APK res string: target_host_root_url
+BASE_URL = "https://ce-a24.corethree.net/"
 REMOTE_HOST = "ce.corethree.net"
 
-# Static AES-256-CBC key/IV for c3-controlvals, lifted verbatim from the APK (zd/a.java).
 _CONTROLVALS_KEY = base64.b64decode("diS1dUbsVQyWSRA5zhAbKJrxYmLa7hD5CVUWc4OZaRs=")
 _CONTROLVALS_IV = _CONTROLVALS_KEY[:16]
 
@@ -57,7 +53,7 @@ def encrypt_controlvals(fields: dict[str, str]) -> str:
     form = "&".join(
         f"{urllib.parse.quote(k)}={urllib.parse.quote(v)}"
         for k, v in fields.items()
-        if k != "FindLocation-cursor_location"  # the app omits this control from the payload
+        if k != "FindLocation-cursor_location"
     )
     cipher = AES.new(_CONTROLVALS_KEY, AES.MODE_CBC, _CONTROLVALS_IV)
     return base64.b64encode(cipher.encrypt(pad(form.encode("utf-8"), AES.block_size))).decode("ascii")
@@ -303,8 +299,6 @@ class HireCode:
 
 @dataclass(frozen=True)
 class VerificationRequired:
-    # confirm_hire returns this instead of a HireCode when the device_id is
-    # untrusted: an SMS OTP is sent, to be submitted via CoreClient.verify_device.
     verify_uri: str
     pincode_fields: list[str]
     message: str
@@ -380,7 +374,6 @@ class CoreClient:
             body.update(params)
         if control_vals:
             headers["c3-applysensitivedatacheck"] = "y"
-            # The app injects this flag into the encrypted set before encrypting.
             body["c3-controlvals"] = encrypt_controlvals({**control_vals, "encryptionverificationcheck": "1"})
 
         # A stuck request hangs until the gateway 504s it, so cap the read below that

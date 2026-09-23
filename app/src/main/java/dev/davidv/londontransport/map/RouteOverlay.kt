@@ -13,10 +13,6 @@ import org.osmdroid.views.overlay.Overlay
 
 data class DrawnRoute(val path: RoutePath, val colour: Int)
 
-/**
- * Sits below the station dots so a route never hides the thing you are looking for. Points are
- * projected per frame; a bus route is a few hundred of them, which costs nothing next to the tiles.
- */
 class RouteOverlay(private val density: Float) : Overlay() {
   private var placed: List<Placed> = emptyList()
 

@@ -34,7 +34,6 @@ import kotlinx.coroutines.delay
 private val UNTIL: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm").withZone(LONDON_TIME)
 private const val TICK_MS = 10_000L
 
-/** Recomputed on a timer, because the only thing that changes about a code is how long it has left. */
 @Composable
 private fun rememberRemaining(expiresAt: Instant): Duration {
   val remaining by
@@ -54,7 +53,6 @@ private fun leftToRun(remaining: Duration): String =
     else -> "${remaining.toMinutes()} min left"
   }
 
-/** Follows the rider off the station sheet, since the code is needed at the dock, not on screen. */
 @Composable
 fun ReleaseCodeBar(hire: ActiveHire, onOpen: () -> Unit, onDismiss: () -> Unit) {
   val remaining = rememberRemaining(hire.expiresAt)

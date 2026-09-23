@@ -18,12 +18,10 @@ private const val SMS_INTRO = "member_sms_desc1"
 private const val LOGIN_CONTINUE = "login_continue_button"
 private const val TEXT_BOX = "Node.FormControls.TextBox"
 
-/** How long a release code lasts when the server did not print an expiry alongside it. */
 private val ASSUMED_LIFETIME: Duration = Duration.ofMinutes(10)
 
 data class HireCode(val code: ReleaseCode, val station: String, val validUntil: LocalTime?)
 
-/** An untrusted device: the digits texted to the account go back to [verifyUri], one per field. */
 data class SmsChallenge(val verifyUri: String, val pincodeFields: List<String>, val message: String)
 
 sealed interface HirePage {
@@ -31,7 +29,6 @@ sealed interface HirePage {
 
   data class VerificationNeeded(val challenge: SmsChallenge) : HirePage
 
-  /** The server declined in a sentence: no bikes here, hire limit reached, account on hold. */
   data class Refused(val message: String) : HirePage
 
   data class Malformed(val reason: String) : HirePage
@@ -78,9 +75,9 @@ private fun smsChallenge(nodes: List<Node>): SmsChallenge? {
 }
 
 /**
- * When the code stops working. The server prints an absolute wall-clock time and nothing else, so a
- * time already past today belongs to tomorrow. A code with no printed expiry is still a code the
- * rider has been charged for, so it is kept for the usual ten minutes rather than discarded.
+ * The server prints an absolute wall-clock time and nothing else, so a time already past today
+ * belongs to tomorrow. A code with no printed expiry has still been charged for, so it is kept for
+ * the usual ten minutes rather than discarded.
  */
 fun releaseCodeExpiry(issuedAt: Instant, validUntil: LocalTime?, zone: ZoneId = LONDON_TIME): Instant {
   if (validUntil == null) return issuedAt.plus(ASSUMED_LIFETIME)
@@ -89,7 +86,6 @@ fun releaseCodeExpiry(issuedAt: Instant, validUntil: LocalTime?, zone: ZoneId = 
   return (if (sameDay.toInstant() < issuedAt) sameDay.plusDays(1) else sameDay).toInstant()
 }
 
-/** Step one of login answers with a confirmation page; its Continue button is step two's target. */
 fun loginContinuation(nodes: List<Node>): String? =
   nodes.firstOrNull { it.id == LOGIN_CONTINUE }?.targetUri?.takeIf { it.isNotBlank() }
 

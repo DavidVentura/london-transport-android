@@ -23,10 +23,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 
-/**
- * Reached only by asking for a bike, and it hands the rider back to that same request once the
- * account answers — so it says which dock is waiting.
- */
 @Composable
 fun LoginSheet(
   stationName: String,
@@ -94,7 +90,6 @@ fun LoginSheet(
         Text(if (busy) "Logging in…" else "Log in", modifier = Modifier.padding(start = 8.dp))
       }
     }
-    // The backend times its own login out often enough that one attempt regularly is not enough.
     if (busy) {
       Text(
         "This can take a few tries; the app keeps retrying.",

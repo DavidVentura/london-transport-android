@@ -72,7 +72,6 @@ private val FRESH_CREDENTIALS = Credentials(UserNodeId("node"), AuthToken("secon
 
 private val NOW: Instant = Instant.parse("2026-08-18T21:28:26Z")
 
-/** Answers whatever the test lines up, and remembers what it was asked. */
 private class FakeApi(
   private val logins: MutableList<LoginResult> = mutableListOf(),
   private val hires: MutableList<HireResult> = mutableListOf(),
@@ -110,7 +109,6 @@ private class FakeApi(
   }
 }
 
-/** Stands in for whatever tracks workouts on the phone. */
 private class FakeWorkouts : WorkoutSignal {
   var starts = 0
     private set

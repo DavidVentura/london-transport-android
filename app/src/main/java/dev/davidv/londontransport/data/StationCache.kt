@@ -30,10 +30,6 @@ sealed interface CacheRead {
   data class Unreadable(val reason: String) : CacheRead
 }
 
-/**
- * Keeps where the stations are, never how full they were. A count that survived a reboot would be a
- * lie by the time anyone read it, so [StationStatus.Unknown] is all that comes back from here.
- */
 class StationCache(private val file: File) {
   private val json = Json
 

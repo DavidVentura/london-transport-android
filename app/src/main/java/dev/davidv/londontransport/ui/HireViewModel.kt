@@ -27,7 +27,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-/** One tap on one dock's button, carried through however many steps it takes to answer it. */
 data class HireRequest(
   val station: FeatureKey,
   val stationName: String,
@@ -89,7 +88,6 @@ class HireViewModel(
     viewModelScope.launch { hires.hire.collect(::hold) }
   }
 
-  /** Keeps a code only while a dock would still take it, then drops it without being asked. */
   private suspend fun hold(stored: ActiveHire?) {
     expiry?.cancel()
     if (stored == null) {
@@ -134,10 +132,9 @@ class HireViewModel(
     api.hire(credentials, request.target.terminal, request.target.point)
 
   /**
-   * The token is the only thing that says who the rider is, and the backend drops it whenever it
-   * likes. The password is on file for exactly this, so a dead token is traded for a live one
-   * without the rider seeing it. Null means they have to type it themselves, and the form asking
-   * them to is already on screen by then.
+   * The backend drops tokens whenever it likes, so a dead token is silently traded for a live one.
+   * Null means the rider has to type the password themselves, and the form asking for it is already
+   * on screen by then.
    */
   private suspend fun relogin(request: HireRequest): Credentials? {
     val account = _state.value.account
@@ -230,7 +227,6 @@ class HireViewModel(
     }
   }
 
-  /** Closes whichever step is on screen; nothing has been released yet at any of them. */
   fun dismiss() {
     _state.update { it.copy(flow = HireFlow.Idle) }
   }

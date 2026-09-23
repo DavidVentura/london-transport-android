@@ -279,7 +279,6 @@ private fun kindLabel(kind: TransportKind): String =
     TransportKind.TUBE -> "tube"
   }
 
-/** Off, starred only, or every station — one button rather than a toggle plus a filter. */
 @Composable
 private fun BikeDisplayButton(display: BikeDisplay, onClick: () -> Unit) {
   IconButton(onClick = onClick) {

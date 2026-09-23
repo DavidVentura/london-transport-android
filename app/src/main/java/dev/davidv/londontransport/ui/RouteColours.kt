@@ -15,7 +15,6 @@ private val BUS_COLOURS =
     Color(0xFF2E7D32),
   )
 
-/** The line colours off the roundel, so a drawn tube line looks like the one on the map at Bank. */
 private val TUBE_COLOURS =
   mapOf(
     "bakerloo" to Color(0xFFB36305),
@@ -46,10 +45,7 @@ private val TUBE_NAMES =
     "waterloo-city" to "Waterloo & City",
   )
 
-/**
- * A bus route is its number, but a tube line's id is a slug. Kept here rather than taken from the
- * catalogue so a saved line still reads properly with no network.
- */
+/** Kept here rather than taken from the catalogue so a saved line still reads properly offline. */
 fun lineLabel(line: LineId, kind: TransportKind): String =
   when (kind) {
     TransportKind.TUBE -> TUBE_NAMES[line.value] ?: line.value

@@ -26,10 +26,7 @@ fun stationFeature(station: Station): MapFeature =
     hire = hireTarget(station),
   )
 
-/**
- * A dock that is locked or gone cannot hand out a bike, so it gets no button. A dock read back from
- * the cache still can: the counts are unknown, not the dock.
- */
+/** A dock read back from the cache still gets a button: the counts are unknown, not the dock. */
 private fun hireTarget(station: Station): HireTarget? {
   val status = station.status
   if (status is StationStatus.Live && status.state != StationState.OPERATIONAL) return null

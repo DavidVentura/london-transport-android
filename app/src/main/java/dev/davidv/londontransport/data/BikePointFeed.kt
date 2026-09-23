@@ -28,10 +28,6 @@ data class ParsedFeed(val stations: List<Station>, val malformed: List<Malformed
 
 private val json = Json { ignoreUnknownKeys = true }
 
-/**
- * Turns the TfL BikePoint payload into domain stations. A record missing any field we depend on is
- * dropped whole rather than half-trusted; the rest of the feed still comes through.
- */
 fun parseBikePointFeed(body: String): ParsedFeed {
   val (parsed, malformed) =
     json

@@ -48,7 +48,6 @@ data class RoutesState(
 
   fun drawable(kinds: Set<TransportKind>): List<SavedRoute> = shown(kinds)
 
-  /** Every stop of every drawn route, as map features the same overlay can hit-test. */
   fun stopFeatures(kinds: Set<TransportKind>): List<MapFeature> =
     shown(kinds).flatMap { route ->
       val path = route.path ?: return@flatMap emptyList()
@@ -119,11 +118,7 @@ class RoutesViewModel(
     }
   }
 
-  /**
-   * Draws from disk first, then replaces each route with whatever TfL says today. A route is a
-   * timetable rather than a live count, so asking a few times a day is plenty — and hiding a line
-   * re-emits the saved list, which should not cost a request at all.
-   */
+  /** Hiding a line re-emits the saved list, which should not cost a request. */
   private suspend fun refresh(lines: List<SavedLine>, refresh: Refresh) {
     if (lines.isEmpty()) {
       _state.update { it.copy(routes = emptyList()) }
@@ -199,7 +194,7 @@ class RoutesViewModel(
     /** A published route barely moves; the docking station counts are what need chasing. */
     val MAX_AGE: Duration = Duration.ofHours(4)
 
-    /** "5" before "43" before "N5" before "X68", the way a Londoner reads a route list. */
+    /** "5" before "43" before "N5" before "X68". */
     val BY_NUMBER =
       compareBy<TransitLine>(
         { if (it.kind == TransportKind.TUBE) 0 else 1 },

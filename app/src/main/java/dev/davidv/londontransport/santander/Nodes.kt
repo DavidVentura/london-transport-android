@@ -5,10 +5,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 
-/**
- * One entry of a flatjson response. Every screen and every action on this backend answers with a
- * flat list of these; only the handful of fields below are ever read.
- */
 @Serializable
 data class Node(
   @SerialName("Type") val type: String = "",
@@ -30,7 +26,6 @@ sealed interface NodeReply {
 
 private const val ERROR_NODE = "Node.Internal.Error"
 
-/** A one-node response that is a plain sentence: "no bikes here", "your device is verified". */
 const val SIMPLE_RESPONSE_NODE = "Node.Internal.SimpleResponse"
 
 const val USER_NODE = "Node.Internal.User"
@@ -60,6 +55,5 @@ private val SESSION_GONE = Regex("logged out|log ?in again", RegexOption.IGNORE_
  */
 fun loggedOut(message: String): Boolean = SESSION_GONE.containsMatchIn(message)
 
-/** The lone sentence of a [SIMPLE_RESPONSE_NODE] reply, or null when the reply is a real page. */
 fun simpleResponse(nodes: List<Node>): String? =
   nodes.singleOrNull()?.takeIf { it.type == SIMPLE_RESPONSE_NODE }?.name

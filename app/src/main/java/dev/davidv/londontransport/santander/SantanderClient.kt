@@ -15,7 +15,6 @@ import okhttp3.Request
 sealed interface LoginResult {
   data class Success(val credentials: Credentials) : LoginResult
 
-  /** The backend said no: wrong password, locked account. */
   data class Rejected(val message: String) : LoginResult
 
   data class Unavailable(val reason: String) : LoginResult
@@ -28,7 +27,6 @@ sealed interface HireResult {
 
   data class Refused(val message: String) : HireResult
 
-  /** The stored token is no longer accepted; nothing but a fresh login gets past this. */
   data object LoggedOut : HireResult
 
   data class Unavailable(val reason: String) : HireResult
@@ -44,15 +42,10 @@ sealed interface VerifyResult {
   data class Unavailable(val reason: String) : VerifyResult
 }
 
-/**
- * Everything the app can do against the Santander Cycles backend. Three calls, each of which either
- * finishes the job or names what stopped it; nodes, part uris and encrypted form values stay behind
- * this interface.
- */
 interface SantanderApi {
   suspend fun login(email: String, password: Password): LoginResult
 
-  /** Releases a physical bike. There is no cancel: a [HireResult.Released] is already a charge. */
+  /** There is no cancel: a [HireResult.Released] is already a charge. */
   suspend fun hire(credentials: Credentials, terminal: TerminalName, point: PointName): HireResult
 
   suspend fun verifyDevice(
@@ -236,9 +229,8 @@ class SantanderClient(
   }
 
   /**
-   * The backend answers a working request in seconds and hangs a failing one to its own gateway
-   * timeout, so a slow call is retried rather than waited out. Only login is habitually affected,
-   * but a retried hire is safe: nothing commits until the confirm call returns.
+   * The backend hangs a failing request until its gateway times out, so a slow call is retried
+   * rather than waited out. A retried hire is safe: nothing commits until the confirm call returns.
    */
   private suspend fun send(request: Request): Fetch {
     var last = "no answer"

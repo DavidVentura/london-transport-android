@@ -24,8 +24,8 @@ private const val MEDIUM_FROM_ZOOM = 13.0
 private const val PIN_COLOUR = 0xFF7B1FA2.toInt()
 
 /**
- * Draws a whole layer as flat shapes in one pass instead of one [org.osmdroid.views.overlay.Marker]
- * per point — the cycle hire network is ~800 stations, which markers do not survive.
+ * Draws flat shapes in one pass instead of one [org.osmdroid.views.overlay.Marker] per point, which
+ * does not survive the whole cycle hire network.
  */
 class FeatureOverlay(
   private val density: Float,

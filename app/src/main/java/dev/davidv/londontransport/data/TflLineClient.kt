@@ -53,7 +53,6 @@ sealed interface LinesResult {
 sealed interface RouteResult {
   data class Success(val path: RoutePath) : RouteResult
 
-  /** The line exists but does not run this way — plenty of routes are one-directional. */
   data object NotServed : RouteResult
 
   data class Unreachable(val reason: String) : RouteResult
@@ -82,7 +81,6 @@ class TflLineClient(private val http: OkHttpClient, private val apiBase: String)
     }
   }
 
-  /** Anything TfL groups under another mode is not something this map knows how to draw. */
   private fun kindOf(modeName: String): TransportKind? =
     when (modeName) {
       "bus" -> TransportKind.BUS
@@ -150,7 +148,7 @@ class TflLineClient(private val http: OkHttpClient, private val apiBase: String)
       }
     }
 
-  /** Each entry is itself a JSON document: an array of segments of `[longitude, latitude]`. */
+  // Each entry is itself a JSON document: an array of segments of `[longitude, latitude]`.
   private fun decodeLineString(encoded: String): List<List<LatLon>> =
     json
       .decodeFromString<List<List<List<Double>>>>(encoded)
