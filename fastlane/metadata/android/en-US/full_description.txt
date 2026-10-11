@@ -3,6 +3,4 @@ This app shows
 - Bus lines
 - Santander Cycles stations
 
-It also lets you hire a bike, but you must first:
-- Register an account
-- Set up a payment method
+It also lets you hire a bike with your Santander Cycles account.
