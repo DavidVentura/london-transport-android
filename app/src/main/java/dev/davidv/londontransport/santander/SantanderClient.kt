@@ -1,8 +1,10 @@
 package dev.davidv.londontransport.santander
 
+import android.util.Log
 import dev.davidv.londontransport.domain.PointName
 import dev.davidv.londontransport.domain.TerminalName
 import java.io.IOException
+import kotlin.time.TimeSource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -336,22 +338,41 @@ class SantanderClient(
    * The backend hangs a failing request until its gateway times out, so a slow call is retried
    * rather than waited out. A retried hire is safe: nothing commits until the confirm call returns.
    */
+  private sealed interface Attempt {
+    data class Done(val fetch: Fetch) : Attempt
+
+    data class Retry(val reason: String) : Attempt
+  }
+
+  /** Every attempt is logged with its time, so a slow hire shows whether it was a retry. */
   private suspend fun send(request: Request): Fetch {
+    val endpoint = request.url.pathSegments.last()
     var last = "no answer"
     repeat(ATTEMPTS) { attempt ->
+      val started = TimeSource.Monotonic.markNow()
       val outcome =
         try {
           http.newCall(request).execute().use { response ->
-            if (response.code in RETRYABLE) Fetch.Failed("HTTP ${response.code}")
-            else if (!response.isSuccessful) return Fetch.Failed("HTTP ${response.code}")
-            else Fetch.Body(response.body.string())
+            when {
+              response.code in RETRYABLE -> Attempt.Retry("HTTP ${response.code}")
+              !response.isSuccessful -> Attempt.Done(Fetch.Failed("HTTP ${response.code}"))
+              else -> Attempt.Done(Fetch.Body(response.body.string()))
+            }
           }
         } catch (e: IOException) {
-          Fetch.Failed(e.message ?: "network unavailable")
+          Attempt.Retry(e.message ?: "network unavailable")
         }
+      val took = started.elapsedNow().inWholeMilliseconds
+      val tried = "$endpoint attempt ${attempt + 1}/$ATTEMPTS"
       when (outcome) {
-        is Fetch.Body -> return outcome
-        is Fetch.Failed -> last = outcome.reason
+        is Attempt.Done -> {
+          Log.i(TAG, "$tried finished in $took ms")
+          return outcome.fetch
+        }
+        is Attempt.Retry -> {
+          Log.w(TAG, "$tried failed after $took ms: ${outcome.reason}")
+          last = outcome.reason
+        }
       }
       if (attempt < ATTEMPTS - 1) delay(RETRY_PAUSE_MS)
     }
@@ -360,6 +381,7 @@ class SantanderClient(
 
   private companion object {
     const val RETRY_PAUSE_MS = 1_000L
+    const val TAG = "SantanderClient"
   }
 }
 

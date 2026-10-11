@@ -120,11 +120,11 @@ class AppGraph(context: Context) {
 
   val santander =
     SantanderClient(
-      // A failing call to this backend hangs until its own gateway gives up at twenty seconds, so
-      // the read timeout sits under that and the client retries instead of waiting it out.
+      // A healthy call to this backend answers almost at once and a failing one hangs until its own
+      // gateway gives up, so the read timeout is short and the client retries instead of waiting.
       http.newBuilder()
-        .readTimeout(15, TimeUnit.SECONDS)
-        .callTimeout(20, TimeUnit.SECONDS)
+        .readTimeout(8, TimeUnit.SECONDS)
+        .callTimeout(12, TimeUnit.SECONDS)
         .build(),
       deviceId,
       replyRecorder(context),

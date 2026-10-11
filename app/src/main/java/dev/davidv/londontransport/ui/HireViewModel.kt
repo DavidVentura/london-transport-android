@@ -27,6 +27,7 @@ import dev.davidv.londontransport.santander.PaymentResult
 import dev.davidv.londontransport.santander.SantanderApi
 import dev.davidv.londontransport.santander.SmsChallenge
 import dev.davidv.londontransport.santander.VerifyResult
+import dev.davidv.londontransport.santander.WebsitePass
 import dev.davidv.londontransport.santander.releaseCodeExpiry
 import java.time.Clock
 import java.time.Duration
@@ -85,6 +86,11 @@ sealed interface HireFlow {
     val savedAs: PaymentMethodId?,
   ) : HireFlow
 
+  data class BuyingOnWebsite(val request: HireRequest, val pass: WebsitePass) : HireFlow
+
+  /** Access is bought; the hire itself still waits for the rider's own tap. */
+  data class Bought(val request: HireRequest) : HireFlow
+
   data class Failed(val request: HireRequest, val message: String) : HireFlow
 }
 
@@ -101,6 +107,9 @@ data class HireState(
 
   fun failure(station: FeatureKey): String? =
     (flow as? HireFlow.Failed)?.takeIf { it.request.station == station }?.message
+
+  fun bought(station: FeatureKey): Boolean =
+    flow is HireFlow.Bought && flow.request.station == station
 }
 
 class HireViewModel(
@@ -269,6 +278,20 @@ class HireViewModel(
         is VerifyResult.Unavailable -> retryVerification(verify, unreachable(result.reason))
       }
     }
+  }
+
+  /**
+   * Closing the website goes back to the dock rather than straight on to a hire: whether anything
+   * was bought is only known by trying, and trying with access is the tap that releases a bike.
+   */
+  fun buyOnWebsite(pass: WebsitePass) {
+    val needs = _state.value.flow as? HireFlow.NeedsAccess ?: return
+    _state.update { it.copy(flow = HireFlow.BuyingOnWebsite(needs.request, pass)) }
+  }
+
+  fun purchaseCompleted() {
+    val buying = _state.value.flow as? HireFlow.BuyingOnWebsite ?: return
+    _state.update { it.copy(flow = HireFlow.Bought(buying.request)) }
   }
 
   fun chooseAccess(option: AccessOption) {

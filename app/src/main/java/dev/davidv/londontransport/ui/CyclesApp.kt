@@ -26,8 +26,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -37,6 +39,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.davidv.londontransport.santander.WebsitePass
 import dev.davidv.londontransport.domain.MapFeature
 import dev.davidv.londontransport.layers.BUS_STOP_LAYER
 import dev.davidv.londontransport.layers.PIN_LAYER
@@ -77,6 +80,27 @@ fun CyclesApp(
   val hire by hireViewModel.state.collectAsStateWithLifecycle()
   var tab by rememberSaveable { mutableStateOf(Tab.MAP) }
   var picking by rememberSaveable { mutableStateOf(false) }
+
+  var debugPurchase by remember { mutableStateOf<WebsitePass?>(null) }
+  debugPurchase?.let { pass ->
+    val close = { debugPurchase = null }
+    PurchaseWebView(pass = pass, account = hire.account, onClose = close, onCompleted = close)
+    return
+  }
+
+  // The banner carries the code from here on, and a sheet still offering Rent bike invites a second
+  // bike by mistake.
+  LaunchedEffect(hire.active?.code) { if (hire.active != null) viewModel.select(null) }
+
+  (hire.flow as? HireFlow.BuyingOnWebsite)?.let { buying ->
+    PurchaseWebView(
+      pass = buying.pass,
+      account = hire.account,
+      onClose = hireViewModel::dismiss,
+      onCompleted = hireViewModel::purchaseCompleted,
+    )
+    return
+  }
 
   BackHandler(enabled = tab != Tab.MAP) { tab = Tab.MAP }
 
@@ -130,6 +154,7 @@ fun CyclesApp(
                 Icon(Icons.Filled.Refresh, contentDescription = "Refresh")
               }
             }
+            DebugMenu(onOpenPurchase = { pass -> debugPurchase = pass })
           },
         )
         hire.active?.let { active ->
@@ -264,6 +289,7 @@ fun CyclesApp(
           options = flow.options,
           opening = flow.opening,
           onChoose = hireViewModel::chooseAccess,
+          onBuyOnWebsite = hireViewModel::buyOnWebsite,
         )
       }
     is HireFlow.Paying ->

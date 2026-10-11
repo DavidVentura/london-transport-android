@@ -76,6 +76,14 @@ fun FeatureSheet(
         busy = hire.releasing(feature.key),
         onRent = onRent,
       )
+      if (hire.bought(feature.key)) {
+        Text(
+          "Access bought. Tap Rent bike to take one out.",
+          style = MaterialTheme.typography.bodyMedium,
+          color = MaterialTheme.colorScheme.primary,
+          modifier = Modifier.padding(top = 12.dp),
+        )
+      }
       hire.failure(feature.key)?.let { message ->
         Text(
           message,

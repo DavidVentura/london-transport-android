@@ -40,6 +40,7 @@ import dev.davidv.londontransport.santander.SantanderApi
 import dev.davidv.londontransport.santander.SmsChallenge
 import dev.davidv.londontransport.santander.UserNodeId
 import dev.davidv.londontransport.santander.VerifyResult
+import dev.davidv.londontransport.santander.WebsitePass
 import dev.davidv.londontransport.ui.HireFlow
 import dev.davidv.londontransport.ui.HireRequest
 import dev.davidv.londontransport.ui.HireState
@@ -509,6 +510,28 @@ class HireViewModelTest {
     val state = model.settled { (it.flow as? HireFlow.Paying)?.errors?.isNotEmpty() == true }
     assertEquals(SAVED.id, (state.flow as HireFlow.Paying).savedAs)
     assertEquals(listOf(SAVED.id), state.savedMethods.map(SavedPaymentMethod::id))
+  }
+
+  @Test
+  fun `buying on the website ends back at the dock, waiting for the rider to rent`() = runTest {
+    val api =
+      FakeApi()
+        .willLogin(LoginResult.Success(CREDENTIALS))
+        .willHire(HireResult.AccessNeeded(listOf(SINGLE)))
+    val model = viewModel(api, stores(backgroundScope))
+
+    model.rent(REQUEST)
+    model.submitLogin("rider@example.com", "hunter2")
+    model.settled { it.account != null }
+    model.rent(REQUEST)
+    model.settled { it.flow is HireFlow.NeedsAccess }
+    model.buyOnWebsite(WebsitePass.Single)
+    assertEquals(HireFlow.BuyingOnWebsite(REQUEST, WebsitePass.Single), model.state.value.flow)
+    model.purchaseCompleted()
+
+    assertEquals(HireFlow.Bought(REQUEST), model.state.value.flow)
+    assertTrue(model.state.value.bought(STATION))
+    assertEquals(listOf("login(rider@example.com)", "hire(001023)"), api.calls)
   }
 
   @Test
