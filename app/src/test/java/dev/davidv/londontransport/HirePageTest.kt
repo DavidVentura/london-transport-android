@@ -1,9 +1,20 @@
 package dev.davidv.londontransport
 
 import dev.davidv.londontransport.domain.ReleaseCode
+import dev.davidv.londontransport.santander.AccessOption
+import dev.davidv.londontransport.santander.BeginPage
+import dev.davidv.londontransport.santander.BillingAddress
+import dev.davidv.londontransport.santander.CardDetails
+import dev.davidv.londontransport.santander.CardType
+import dev.davidv.londontransport.santander.Cvv
+import dev.davidv.londontransport.santander.PaymentMethod
 import dev.davidv.londontransport.santander.HirePage
+import dev.davidv.londontransport.santander.PaymentPage
+import dev.davidv.londontransport.santander.cardControlVals
+import dev.davidv.londontransport.santander.parsePaymentPage
 import dev.davidv.londontransport.santander.NodeReply
 import dev.davidv.londontransport.santander.deviceVerified
+import dev.davidv.londontransport.santander.parseBeginPage
 import dev.davidv.londontransport.santander.parseHirePage
 import dev.davidv.londontransport.santander.parseNodeReply
 import dev.davidv.londontransport.santander.releaseCodeExpiry
@@ -100,5 +111,87 @@ class HirePageTest {
     val issued = Instant.parse("2026-08-18T21:28:26Z")
 
     assertEquals(issued.plusSeconds(600), releaseCodeExpiry(issued, null, LONDON))
+  }
+
+  @Test
+  fun `an account without access is offered each period with its price and terms`() {
+    val page = parseBeginPage(nodes("begin-access-needed.json")) as BeginPage.AccessNeeded
+
+    assertEquals(listOf("Single", "Monthly", "Annual"), page.options.map(AccessOption::name))
+    assertEquals(
+      listOf("£1.65 per person", "£20.00 per person", "£120.00 per person"),
+      page.options.map(AccessOption::price),
+    )
+    assertEquals(
+      listOf(
+        "30mins access begins when a chosen bike has been undocked",
+        "If you choose to undock an ebike you will be charged an additional £1.35",
+        "Longer journeys cost £1.65 at the start of every additional 30 minutes",
+        "Ebikes cost £3.00 at the start of every additional 30 minutes",
+      ),
+      page.options.first().terms,
+    )
+  }
+
+  @Test
+  fun `an empty dock refuses at begin`() {
+    val page = parseBeginPage(nodes("hire-no-bikes.json")) as BeginPage.Refused
+
+    assertTrue(page.message.startsWith("Sorry, but there are no bikes available"))
+  }
+
+  @Test
+  fun `the card page offers its card types and keeps the cardholder it already knows`() {
+    val page = parsePaymentPage(nodes("payment-details.json")) as PaymentPage.Form
+    val form = page.form
+
+    assertEquals("Payment details - Single", form.title)
+    assertEquals("Rider Name", form.cardholder)
+    assertEquals(
+      listOf("Visa", "Mastercard", "Visa_Debit", "American_Express"),
+      form.cardTypes.map(CardType::value),
+    )
+    assertTrue(form.autopay)
+    assertTrue(form.submitUri.contains("postback=submit"))
+    assertEquals(emptyList<String>(), page.errors)
+  }
+
+  @Test
+  fun `a refused card comes back as the card page with the reason under the field`() {
+    val page = parsePaymentPage(nodes("payment-card-rejected.json")) as PaymentPage.Form
+
+    assertEquals(listOf("Please check your card number or the card type"), page.errors)
+  }
+
+  @Test
+  fun `a card is posted back under exactly the controls the card page has`() {
+    val page = nodes("payment-details.json")
+    val controls =
+      page
+        .filter {
+          it.type in
+            setOf(
+              "Node.FormControls.TextBox",
+              "Node.FormControls.ListBox",
+              "Node.FormControls.Toggle",
+            )
+        }
+        .map { it.id }
+        .toSet()
+    val card =
+      CardDetails(
+        PaymentMethod(
+          cardholder = "Rider Name",
+          type = CardType("Visa", "Visa"),
+          number = "4111111111111111",
+          expiryMonth = "01",
+          expiryYear = "30",
+          address = BillingAddress("1", "River Street", "London", "", "United Kingdom", "EC1R 1XX"),
+          autopay = false,
+        ),
+        Cvv("123"),
+      )
+
+    assertEquals(controls, cardControlVals(card).keys)
   }
 }

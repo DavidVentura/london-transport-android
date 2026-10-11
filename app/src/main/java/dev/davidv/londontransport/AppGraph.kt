@@ -8,6 +8,8 @@ import androidx.datastore.preferences.preferencesDataStoreFile
 import dev.davidv.londontransport.data.AccountStore
 import dev.davidv.londontransport.data.ActiveHireStore
 import dev.davidv.londontransport.data.FavouritesStore
+import dev.davidv.londontransport.data.PaymentMethodStore
+import dev.davidv.londontransport.data.PaymentVault
 import dev.davidv.londontransport.data.PinsStore
 import dev.davidv.londontransport.data.RouteCache
 import dev.davidv.londontransport.data.SavedLinesStore
@@ -23,6 +25,7 @@ import dev.davidv.londontransport.layers.MapLayer
 import dev.davidv.londontransport.map.configureOsmdroid
 import dev.davidv.londontransport.santander.DeviceId
 import dev.davidv.londontransport.santander.SantanderClient
+import dev.davidv.londontransport.santander.replyRecorder
 import java.io.File
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
@@ -91,6 +94,15 @@ class AppGraph(context: Context) {
       }
     )
 
+  val paymentMethods =
+    PaymentMethodStore(
+      PreferenceDataStoreFactory.create(scope = storeScope) {
+        context.preferencesDataStoreFile("payment_methods")
+      }
+    )
+
+  val paymentVault = PaymentVault(context)
+
   val workouts = WorkoutBroadcast(context)
 
   /**
@@ -115,6 +127,7 @@ class AppGraph(context: Context) {
         .callTimeout(20, TimeUnit.SECONDS)
         .build(),
       deviceId,
+      replyRecorder(context),
     )
 }
 

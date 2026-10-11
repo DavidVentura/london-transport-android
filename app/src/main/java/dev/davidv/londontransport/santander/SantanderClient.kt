@@ -11,6 +11,7 @@ import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import kotlinx.serialization.json.Json
 
 sealed interface LoginResult {
   data class Success(val credentials: Credentials) : LoginResult
@@ -25,11 +26,35 @@ sealed interface HireResult {
 
   data class VerificationNeeded(val challenge: SmsChallenge) : HireResult
 
+  data class AccessNeeded(val options: List<AccessOption>) : HireResult
+
   data class Refused(val message: String) : HireResult
 
   data object LoggedOut : HireResult
 
   data class Unavailable(val reason: String) : HireResult
+}
+
+sealed interface PayResult {
+  /** Nothing was charged: the card page came back with errors, or the server refused outright. */
+  data class Rejected(val form: PaymentForm, val errors: List<String>) : PayResult
+
+  data class Hire(val result: HireResult) : PayResult
+}
+
+sealed interface PaymentResult {
+  data class Form(val form: PaymentForm) : PaymentResult
+
+  data class Refused(val message: String) : PaymentResult
+
+  data object LoggedOut : PaymentResult
+
+  data class Unavailable(val reason: String) : PaymentResult
+}
+
+/** Keeps raw replies from authenticated calls so pages nobody has mapped yet can be studied. */
+fun interface ReplyRecorder {
+  fun record(url: HttpUrl, body: String)
 }
 
 sealed interface VerifyResult {
@@ -47,6 +72,11 @@ interface SantanderApi {
 
   /** There is no cancel: a [HireResult.Released] is already a charge. */
   suspend fun hire(credentials: Credentials, terminal: TerminalName, point: PointName): HireResult
+
+  /** Only opens the card page; nothing is charged until [pay]. */
+  suspend fun chooseAccess(credentials: Credentials, option: AccessOption): PaymentResult
+
+  suspend fun pay(credentials: Credentials, form: PaymentForm, card: CardDetails): PayResult
 
   suspend fun verifyDevice(
     credentials: Credentials,
@@ -67,6 +97,7 @@ private const val CONFIRM_HIRE = "Clients/TfL/EBikePhase2/ConfirmMemberHire"
 class SantanderClient(
   private val http: OkHttpClient,
   private val deviceId: DeviceId,
+  private val recorder: ReplyRecorder,
   private val base: String = SANTANDER_BASE,
 ) : SantanderApi {
 
@@ -107,10 +138,18 @@ class SantanderClient(
   ): HireResult {
     // Begin is non-committal — it is where an empty or closed dock says so, before anything bills.
     val begun = post(url(BEGIN_HIRE, mapOf("TerminalName" to terminal.value)), credentials)
-    when (begun) {
-      is Reply.Failed -> return HireResult.Unavailable(begun.reason)
-      is Reply.Refused -> return refusedHire(begun.message)
-      is Reply.Page -> simpleResponse(begun.nodes)?.let { return refusedHire(it) }
+    val nodes =
+      when (begun) {
+        is Reply.Failed -> return HireResult.Unavailable(begun.reason)
+        is Reply.Refused -> return refusedHire(begun.message)
+        is Reply.Page -> begun.nodes
+      }
+    when (val page = parseBeginPage(nodes)) {
+      BeginPage.Ready -> Unit
+      // Confirming without access answers only "problem getting a release code".
+      is BeginPage.AccessNeeded -> return HireResult.AccessNeeded(page.options)
+      is BeginPage.Refused -> return refusedHire(page.message)
+      is BeginPage.Malformed -> return HireResult.Unavailable(page.reason)
     }
 
     val confirmed =
@@ -139,6 +178,57 @@ class SantanderClient(
     }
   }
 
+  override suspend fun chooseAccess(
+    credentials: Credentials,
+    option: AccessOption,
+  ): PaymentResult =
+    when (val reply = post(followUrl(option.selectUri), credentials)) {
+      is Reply.Failed -> PaymentResult.Unavailable(reply.reason)
+      is Reply.Refused ->
+        if (loggedOut(reply.message)) PaymentResult.LoggedOut
+        else PaymentResult.Refused(reply.message)
+      is Reply.Page ->
+        when (val page = parsePaymentPage(reply.nodes)) {
+          is PaymentPage.Form -> PaymentResult.Form(page.form)
+          is PaymentPage.Refused ->
+            if (loggedOut(page.message)) PaymentResult.LoggedOut
+            else PaymentResult.Refused(page.message)
+          is PaymentPage.Malformed -> PaymentResult.Unavailable(page.reason)
+        }
+    }
+
+  override suspend fun pay(
+    credentials: Credentials,
+    form: PaymentForm,
+    card: CardDetails,
+  ): PayResult {
+    val url = followUrl(form.submitUri)
+    val controlVals = cardControlVals(card)
+    // The card page echoes what was typed into it, CVV included.
+    val secrets = listOf(card.method.number, card.cvv.value)
+    recorder.record(url, "// sent\n" + redact(Json.encodeToString(controlVals), secrets))
+    val reply = post(url, credentials, controlVals = controlVals, secrets = secrets)
+    val nodes =
+      when (reply) {
+        is Reply.Failed -> return PayResult.Hire(HireResult.Unavailable(reply.reason))
+        is Reply.Refused -> return refusedPayment(form, reply.message)
+        is Reply.Page -> reply.nodes
+      }
+    simpleResponse(nodes)?.let { return refusedPayment(form, it) }
+    val again = parsePaymentPage(nodes)
+    if (again is PaymentPage.Form && again.errors.isNotEmpty()) {
+      return PayResult.Rejected(again.form, again.errors)
+    }
+    return PayResult.Hire(
+      when (val page = parseHirePage(nodes)) {
+        is HirePage.Released -> HireResult.Released(page.code)
+        is HirePage.VerificationNeeded -> HireResult.VerificationNeeded(page.challenge)
+        is HirePage.Refused -> refusedHire(page.message)
+        is HirePage.Malformed -> HireResult.Unavailable("unexpected reply to the payment")
+      }
+    )
+  }
+
   override suspend fun verifyDevice(
     credentials: Credentials,
     challenge: SmsChallenge,
@@ -162,6 +252,14 @@ class SantanderClient(
         else rejectedVerification(simpleResponse(reply.nodes) ?: "That code was not accepted.")
     }
   }
+
+  /** A refusal to the card submit is the backend failing to register the card, before any charge. */
+  private fun refusedPayment(form: PaymentForm, message: String): PayResult =
+    if (loggedOut(message)) PayResult.Hire(HireResult.LoggedOut)
+    else PayResult.Rejected(form, listOf(message))
+
+  private fun redact(body: String, secrets: List<String>): String =
+    secrets.fold(body) { text, secret -> text.replace(secret, "<redacted>") }
 
   private fun refusedHire(message: String): HireResult =
     if (loggedOut(message)) HireResult.LoggedOut else HireResult.Refused(message)
@@ -188,6 +286,7 @@ class SantanderClient(
     url: HttpUrl,
     credentials: Credentials? = null,
     controlVals: Map<String, String>? = null,
+    secrets: List<String> = emptyList(),
   ): Reply =
     withContext(Dispatchers.IO) {
       val body =
@@ -211,7 +310,12 @@ class SantanderClient(
           .apply { if (controlVals != null) header("c3-applysensitivedatacheck", "y") }
           .build()
 
-      when (val text = send(request)) {
+      val text = send(request)
+      // Only authenticated calls are kept: the unauthenticated ones are the login, whose reply is the token.
+      if (text is Fetch.Body && credentials != null) {
+        recorder.record(url, redact(text.text, secrets))
+      }
+      when (text) {
         is Fetch.Failed -> Reply.Failed(text.reason)
         is Fetch.Body ->
           when (val reply = parseNodeReply(text.text)) {

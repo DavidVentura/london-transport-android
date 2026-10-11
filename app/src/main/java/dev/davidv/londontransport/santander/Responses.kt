@@ -17,6 +17,10 @@ private const val PINCODE_PREFIX = "lchs_pincode_"
 private const val SMS_INTRO = "member_sms_desc1"
 private const val LOGIN_CONTINUE = "login_continue_button"
 private const val TEXT_BOX = "Node.FormControls.TextBox"
+private const val LABEL = "Node.FormControls.Label"
+private const val BUTTON = "Node.FormControls.Button"
+private const val BULLET = "&#8226;"
+private const val ACCESS_PICKER = "GenerateLCHSSubscriptionPicker"
 
 private val ASSUMED_LIFETIME: Duration = Duration.ofMinutes(10)
 
@@ -32,6 +36,57 @@ sealed interface HirePage {
   data class Refused(val message: String) : HirePage
 
   data class Malformed(val reason: String) : HirePage
+}
+
+/** One way of paying for hires, as Begin lists them when the account has no access period left. */
+data class AccessOption(
+  val name: String,
+  val price: String,
+  val terms: List<String>,
+  val selectUri: String,
+)
+
+sealed interface BeginPage {
+  /** The account already has access, so Begin is only a formality before Confirm. */
+  data object Ready : BeginPage
+
+  data class AccessNeeded(val options: List<AccessOption>) : BeginPage
+
+  data class Refused(val message: String) : BeginPage
+
+  data class Malformed(val reason: String) : BeginPage
+}
+
+/**
+ * The picker is a flat run of nodes with no grouping, so each option is cut off at its own Select
+ * button: everything between two buttons belongs to the later one.
+ */
+fun parseBeginPage(nodes: List<Node>): BeginPage {
+  val refusal = simpleResponse(nodes)
+  if (refusal != null) return BeginPage.Refused(refusal)
+
+  val selects = nodes.withIndex().filter { (_, node) -> isAccessSelect(node) }
+  if (selects.isEmpty()) return BeginPage.Ready
+
+  val starts = listOf(0) + selects.dropLast(1).map { it.index + 1 }
+  val options =
+    starts.zip(selects).map { (start, select) ->
+      accessOption(nodes.subList(start, select.index), select.value.targetUri)
+        ?: return BeginPage.Malformed("access option without a name and price before ${select.value.id}")
+    }
+  return BeginPage.AccessNeeded(options)
+}
+
+private fun isAccessSelect(node: Node): Boolean =
+  node.type == BUTTON && node.targetUri.contains(ACCESS_PICKER)
+
+private fun accessOption(block: List<Node>, selectUri: String): AccessOption? {
+  val priceAt = block.indexOfFirst { it.type == LABEL && it.name.startsWith("£") }
+  if (priceAt < 1) return null
+  val name = block[priceAt - 1].takeIf { it.type == LABEL }?.name ?: return null
+  val terms =
+    block.zipWithNext().filter { (bullet, _) -> bullet.name == BULLET }.map { (_, term) -> term.name }
+  return AccessOption(name = name, price = block[priceAt].name, terms = terms, selectUri = selectUri)
 }
 
 fun parseHirePage(nodes: List<Node>): HirePage {

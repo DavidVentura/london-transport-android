@@ -70,6 +70,7 @@ fun CyclesApp(
   viewModel: CyclesViewModel,
   routesViewModel: RoutesViewModel,
   hireViewModel: HireViewModel,
+  unlocker: PaymentUnlocker,
 ) {
   val state by viewModel.state.collectAsStateWithLifecycle()
   val routes by routesViewModel.state.collectAsStateWithLifecycle()
@@ -251,6 +252,39 @@ fun CyclesApp(
           busy = flow.busy,
           error = flow.error,
           onSubmit = hireViewModel::submitLogin,
+        )
+      }
+    is HireFlow.NeedsAccess ->
+      ModalBottomSheet(
+        onDismissRequest = hireViewModel::dismiss,
+        sheetState = rememberModalBottomSheetState(),
+      ) {
+        AccessSheet(
+          purchase = ACCESS_PURCHASE,
+          options = flow.options,
+          opening = flow.opening,
+          onChoose = hireViewModel::chooseAccess,
+        )
+      }
+    is HireFlow.Paying ->
+      ModalBottomSheet(
+        onDismissRequest = { if (!flow.busy) hireViewModel.dismiss() },
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+      ) {
+        PaymentSheet(
+          form = flow.form,
+          busy = flow.busy,
+          errors = flow.errors,
+          save = flow.save,
+          savedAs = flow.savedAs,
+          draft = hire.draft,
+          saved = hire.savedMethods,
+          unlocker = unlocker,
+          onPay = hireViewModel::pay,
+          onEdit = hireViewModel::edit,
+          onStopEditing = hireViewModel::stopEditing,
+          onForget = hireViewModel::forgetMethod,
+          onForgetAll = hireViewModel::forgetAllMethods,
         )
       }
     is HireFlow.Verify ->

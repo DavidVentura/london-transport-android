@@ -13,7 +13,13 @@ data class Node(
   @SerialName("Subtitle") val subtitle: String = "",
   @SerialName("TargetUri") val targetUri: String = "",
   @SerialName("AuthToken") val authToken: String = "",
+  @SerialName("ParentID") val parentId: String = "",
+  @SerialName("Value") val value: String = "",
+  @SerialName("State") val state: Int = 0,
+  @SerialName("Tags") val tags: NodeTags = NodeTags(),
 )
+
+@Serializable data class NodeTags(@SerialName("Style.Class") val styleClass: String = "")
 
 sealed interface NodeReply {
   data class Nodes(val nodes: List<Node>) : NodeReply

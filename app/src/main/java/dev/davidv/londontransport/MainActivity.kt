@@ -1,19 +1,21 @@
 package dev.davidv.londontransport
 
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import dev.davidv.londontransport.ui.CyclesApp
 import dev.davidv.londontransport.ui.CyclesViewModel
 import dev.davidv.londontransport.ui.HireViewModel
+import dev.davidv.londontransport.ui.PaymentUnlocker
 import dev.davidv.londontransport.ui.RoutesViewModel
 import dev.davidv.londontransport.ui.LondonTransportTheme
 
-class MainActivity : ComponentActivity() {
+/** A FragmentActivity because the fingerprint prompt that unlocks saved cards is a fragment. */
+class MainActivity : FragmentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     enableEdgeToEdge()
@@ -29,7 +31,14 @@ class MainActivity : ComponentActivity() {
     }
     val hire = viewModelFactory {
       initializer {
-        HireViewModel(graph.santander, graph.account, graph.activeHire, graph.workouts)
+        HireViewModel(
+          graph.santander,
+          graph.account,
+          graph.activeHire,
+          graph.paymentMethods,
+          graph.paymentVault,
+          graph.workouts,
+        )
       }
     }
 
@@ -39,6 +48,7 @@ class MainActivity : ComponentActivity() {
           viewModel(factory = cycles),
           viewModel(factory = routes),
           viewModel(factory = hire),
+          PaymentUnlocker(this, graph.paymentVault),
         )
       }
     }
