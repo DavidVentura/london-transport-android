@@ -3,15 +3,7 @@ package dev.davidv.londontransport
 import dev.davidv.londontransport.domain.ReleaseCode
 import dev.davidv.londontransport.santander.AccessOption
 import dev.davidv.londontransport.santander.BeginPage
-import dev.davidv.londontransport.santander.BillingAddress
-import dev.davidv.londontransport.santander.CardDetails
-import dev.davidv.londontransport.santander.CardType
-import dev.davidv.londontransport.santander.Cvv
-import dev.davidv.londontransport.santander.PaymentMethod
 import dev.davidv.londontransport.santander.HirePage
-import dev.davidv.londontransport.santander.PaymentPage
-import dev.davidv.londontransport.santander.cardControlVals
-import dev.davidv.londontransport.santander.parsePaymentPage
 import dev.davidv.londontransport.santander.NodeReply
 import dev.davidv.londontransport.santander.deviceVerified
 import dev.davidv.londontransport.santander.parseBeginPage
@@ -140,58 +132,4 @@ class HirePageTest {
     assertTrue(page.message.startsWith("Sorry, but there are no bikes available"))
   }
 
-  @Test
-  fun `the card page offers its card types and keeps the cardholder it already knows`() {
-    val page = parsePaymentPage(nodes("payment-details.json")) as PaymentPage.Form
-    val form = page.form
-
-    assertEquals("Payment details - Single", form.title)
-    assertEquals("Rider Name", form.cardholder)
-    assertEquals(
-      listOf("Visa", "Mastercard", "Visa_Debit", "American_Express"),
-      form.cardTypes.map(CardType::value),
-    )
-    assertTrue(form.autopay)
-    assertTrue(form.submitUri.contains("postback=submit"))
-    assertEquals(emptyList<String>(), page.errors)
-  }
-
-  @Test
-  fun `a refused card comes back as the card page with the reason under the field`() {
-    val page = parsePaymentPage(nodes("payment-card-rejected.json")) as PaymentPage.Form
-
-    assertEquals(listOf("Please check your card number or the card type"), page.errors)
-  }
-
-  @Test
-  fun `a card is posted back under exactly the controls the card page has`() {
-    val page = nodes("payment-details.json")
-    val controls =
-      page
-        .filter {
-          it.type in
-            setOf(
-              "Node.FormControls.TextBox",
-              "Node.FormControls.ListBox",
-              "Node.FormControls.Toggle",
-            )
-        }
-        .map { it.id }
-        .toSet()
-    val card =
-      CardDetails(
-        PaymentMethod(
-          cardholder = "Rider Name",
-          type = CardType("Visa", "Visa"),
-          number = "4111111111111111",
-          expiryMonth = "01",
-          expiryYear = "30",
-          address = BillingAddress("1", "River Street", "London", "", "United Kingdom", "EC1R 1XX"),
-          autopay = false,
-        ),
-        Cvv("123"),
-      )
-
-    assertEquals(controls, cardControlVals(card).keys)
-  }
 }

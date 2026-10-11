@@ -5,10 +5,5 @@
     <cloud-backup>
         <!-- The account token can take a bike out and be charged for it, so it stays on the phone. -->
         <exclude domain="file" path="datastore/account.preferences_pb"/>
-        <!-- Sealed under a Keystore key that never leaves this phone, so a restored copy could not open. -->
-        <exclude domain="file" path="datastore/payment_methods.preferences_pb"/>
     </cloud-backup>
-    <device-transfer>
-        <exclude domain="file" path="datastore/payment_methods.preferences_pb"/>
-    </device-transfer>
 </data-extraction-rules>

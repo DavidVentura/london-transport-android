@@ -5,37 +5,22 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import dev.davidv.londontransport.data.AccountStore
 import dev.davidv.londontransport.data.ActiveHireStore
-import dev.davidv.londontransport.data.PaymentMethodStore
-import dev.davidv.londontransport.data.Sealing
-import dev.davidv.londontransport.data.StoredPayment
 import dev.davidv.londontransport.domain.ActiveHire
 import dev.davidv.londontransport.domain.FeatureId
 import dev.davidv.londontransport.domain.FeatureKey
 import dev.davidv.londontransport.domain.HireTarget
 import dev.davidv.londontransport.domain.LayerId
-import dev.davidv.londontransport.domain.PaymentMethodId
-import dev.davidv.londontransport.domain.SaveRequest
-import dev.davidv.londontransport.domain.SavedPaymentMethod
-import dev.davidv.londontransport.domain.Sealed
 import dev.davidv.londontransport.domain.PointName
 import dev.davidv.londontransport.domain.ReleaseCode
 import dev.davidv.londontransport.domain.TerminalName
 import dev.davidv.londontransport.domain.WorkoutSignal
 import dev.davidv.londontransport.santander.AccessOption
 import dev.davidv.londontransport.santander.AuthToken
-import dev.davidv.londontransport.santander.BillingAddress
-import dev.davidv.londontransport.santander.CardType
-import dev.davidv.londontransport.santander.Cvv
-import dev.davidv.londontransport.santander.PaymentMethod
 import dev.davidv.londontransport.santander.Credentials
 import dev.davidv.londontransport.santander.HireCode
 import dev.davidv.londontransport.santander.HireResult
 import dev.davidv.londontransport.santander.LoginResult
-import dev.davidv.londontransport.santander.CardDetails
 import dev.davidv.londontransport.santander.Password
-import dev.davidv.londontransport.santander.PayResult
-import dev.davidv.londontransport.santander.PaymentForm
-import dev.davidv.londontransport.santander.PaymentResult
 import dev.davidv.londontransport.santander.SantanderApi
 import dev.davidv.londontransport.santander.SmsChallenge
 import dev.davidv.londontransport.santander.UserNodeId
@@ -93,42 +78,6 @@ private val SINGLE =
     selectUri = "part://Clients.TfL.EBikePhase2.TSUF.GenerateLCHSSubscriptionPicker?action=subscribe10017",
   )
 
-private val PAYMENT_FORM =
-  PaymentForm(
-    title = "Payment details - Single",
-    cardholder = "Rider Name",
-    cardTypes = listOf(CardType("Visa", "Visa")),
-    autopay = true,
-    submitUri = "part://Clients.TfL.EBikePhase2.TSUF.GenerateLCHSPaymentDetails?postback=submit",
-  )
-
-private val CARD =
-  CardDetails(
-    PaymentMethod(
-      cardholder = "Rider Name",
-      type = CardType("Visa", "Visa"),
-      number = "4111111111111111",
-      expiryMonth = "01",
-      expiryYear = "30",
-      address = BillingAddress("1", "River Street", "London", "", "United Kingdom", "EC1R 1XX"),
-      autopay = true,
-    ),
-    Cvv("123"),
-  )
-
-private val SEALED = Sealed(wrappedKey = "a2V5", iv = "aXY=", ciphertext = "c2VhbGVk")
-
-private val SAVE = SaveRequest(name = "Everyday Visa", keepCvv = false)
-
-private val SAVED =
-  SavedPaymentMethod(
-    id = PaymentMethodId("method-1"),
-    name = "Everyday Visa",
-    summary = "Visa ••1111",
-    cvvSaved = false,
-    sealed = SEALED,
-  )
-
 private val FRESH_CREDENTIALS = Credentials(UserNodeId("node"), AuthToken("second-token"))
 
 private val NOW: Instant = Instant.parse("2026-08-18T21:28:26Z")
@@ -137,8 +86,6 @@ private class FakeApi(
   private val logins: MutableList<LoginResult> = mutableListOf(),
   private val hires: MutableList<HireResult> = mutableListOf(),
   private val verifications: MutableList<VerifyResult> = mutableListOf(),
-  private val payments: MutableList<PaymentResult> = mutableListOf(),
-  private val paid: MutableList<PayResult> = mutableListOf(),
 ) : SantanderApi {
   val calls = mutableListOf<String>()
 
@@ -147,10 +94,6 @@ private class FakeApi(
   fun willHire(vararg results: HireResult) = apply { hires += results }
 
   fun willVerify(vararg results: VerifyResult) = apply { verifications += results }
-
-  fun willOpenPayment(vararg results: PaymentResult) = apply { payments += results }
-
-  fun willPay(vararg results: PayResult) = apply { paid += results }
 
   override suspend fun login(email: String, password: Password): LoginResult {
     calls += "login($email)"
@@ -164,23 +107,6 @@ private class FakeApi(
   ): HireResult {
     calls += "hire(${terminal.value})"
     return hires.removeFirst()
-  }
-
-  override suspend fun chooseAccess(
-    credentials: Credentials,
-    option: AccessOption,
-  ): PaymentResult {
-    calls += "chooseAccess(${option.name})"
-    return payments.removeFirst()
-  }
-
-  override suspend fun pay(
-    credentials: Credentials,
-    form: PaymentForm,
-    card: CardDetails,
-  ): PayResult {
-    calls += "pay"
-    return paid.removeFirst()
   }
 
   override suspend fun verifyDevice(
@@ -224,28 +150,16 @@ class HireViewModelTest {
     }
 
   /** One set of stores per test: two DataStores over one file refuse to run together. */
-  private fun stores(scope: CoroutineScope): Triple<AccountStore, ActiveHireStore, PaymentMethodStore> =
-    Triple(
-      AccountStore(preferences(scope, "account")),
-      ActiveHireStore(preferences(scope, "hire")),
-      PaymentMethodStore(preferences(scope, "payment_methods")),
-    )
+  private fun stores(scope: CoroutineScope): Pair<AccountStore, ActiveHireStore> =
+    AccountStore(preferences(scope, "account")) to ActiveHireStore(preferences(scope, "hire"))
 
   private fun viewModel(
     api: SantanderApi,
-    stores: Triple<AccountStore, ActiveHireStore, PaymentMethodStore>,
+    stores: Pair<AccountStore, ActiveHireStore>,
     workouts: WorkoutSignal = FakeWorkouts(),
     now: Instant = NOW,
   ) =
-    HireViewModel(
-      api,
-      stores.first,
-      stores.second,
-      stores.third,
-      { _ -> Sealing(SEALED, previousLost = false) },
-      workouts,
-      Clock.fixed(now, ZoneOffset.UTC),
-    )
+    HireViewModel(api, stores.first, stores.second, workouts, Clock.fixed(now, ZoneOffset.UTC))
 
   /**
    * The stores write to a real file off the test dispatcher, so every step that saves lands a beat
@@ -381,12 +295,11 @@ class HireViewModelTest {
   }
 
   @Test
-  fun `an account without access is shown the periods instead of a refusal`() = runTest {
-    val options = listOf(SINGLE)
+  fun `an account without access is sent to buy some instead of being refused`() = runTest {
     val api =
       FakeApi()
         .willLogin(LoginResult.Success(CREDENTIALS))
-        .willHire(HireResult.AccessNeeded(options))
+        .willHire(HireResult.AccessNeeded(listOf(SINGLE)))
     val model = viewModel(api, stores(backgroundScope))
 
     model.rent(REQUEST)
@@ -395,121 +308,8 @@ class HireViewModelTest {
     model.rent(REQUEST)
 
     val state = model.settled { it.flow is HireFlow.NeedsAccess }
-    assertEquals(HireFlow.NeedsAccess(REQUEST, CREDENTIALS, options, opening = null), state.flow)
+    assertEquals(HireFlow.NeedsAccess(REQUEST), state.flow)
     assertNull(state.failure(STATION))
-  }
-
-  @Test
-  fun `picking a period opens the card page, and paying releases the bike`() = runTest {
-    val api =
-      FakeApi()
-        .willLogin(LoginResult.Success(CREDENTIALS))
-        .willHire(HireResult.AccessNeeded(listOf(SINGLE)))
-        .willOpenPayment(PaymentResult.Form(PAYMENT_FORM))
-        .willPay(PayResult.Hire(released()))
-    val model = viewModel(api, stores(backgroundScope))
-
-    model.rent(REQUEST)
-    model.submitLogin("rider@example.com", "hunter2")
-    model.settled { it.account != null }
-    model.rent(REQUEST)
-    model.settled { it.flow is HireFlow.NeedsAccess }
-    model.chooseAccess(SINGLE)
-    assertEquals(
-      HireFlow.Paying(
-        REQUEST,
-        CREDENTIALS,
-        PAYMENT_FORM,
-        busy = false,
-        errors = emptyList(),
-        save = null,
-        savedAs = null,
-      ),
-      model.settled { it.flow is HireFlow.Paying }.flow,
-    )
-    model.pay(CARD, SAVE)
-
-    val state = model.settled { it.active != null && it.savedMethods.isNotEmpty() }
-    assertEquals(
-      listOf(SAVED.copy(id = state.savedMethods.single().id)),
-      state.savedMethods,
-    )
-    assertEquals(ReleaseCode("13212"), state.active?.code)
-    assertEquals(
-      listOf("login(rider@example.com)", "hire(001023)", "chooseAccess(Single)", "pay"),
-      api.calls,
-    )
-  }
-
-  @Test
-  fun `a refused card keeps the card sheet open with the reason, ready for another go`() = runTest {
-    val error = "Please check your card number or the card type"
-    val api =
-      FakeApi()
-        .willLogin(LoginResult.Success(CREDENTIALS))
-        .willHire(HireResult.AccessNeeded(listOf(SINGLE)))
-        .willOpenPayment(PaymentResult.Form(PAYMENT_FORM))
-        .willPay(PayResult.Rejected(PAYMENT_FORM, listOf(error)))
-    val model = viewModel(api, stores(backgroundScope))
-
-    model.rent(REQUEST)
-    model.submitLogin("rider@example.com", "hunter2")
-    model.settled { it.account != null }
-    model.rent(REQUEST)
-    model.settled { it.flow is HireFlow.NeedsAccess }
-    model.chooseAccess(SINGLE)
-    model.settled { it.flow is HireFlow.Paying }
-    model.pay(CARD, SAVE)
-
-    val state =
-      model.settled {
-        (it.flow as? HireFlow.Paying)?.errors?.isNotEmpty() == true && it.savedMethods.isNotEmpty()
-      }
-    val saved = state.savedMethods.single()
-    // The save choice survives the rejection, so the corrected retry goes out without asking again,
-    // and replaces the entry this attempt saved rather than adding a second one.
-    assertEquals(
-      HireFlow.Paying(
-        REQUEST,
-        CREDENTIALS,
-        PAYMENT_FORM,
-        busy = false,
-        errors = listOf(error),
-        save = SAVE,
-        savedAs = saved.id,
-      ),
-      state.flow,
-    )
-    assertEquals(StoredPayment(CARD.method, CARD.cvv), state.draft)
-  }
-
-  @Test
-  fun `editing a saved method fills the form and the next attempt replaces it`() = runTest {
-    val stores = stores(backgroundScope)
-    stores.third.put(SAVED)
-    val api =
-      FakeApi()
-        .willLogin(LoginResult.Success(CREDENTIALS))
-        .willHire(HireResult.AccessNeeded(listOf(SINGLE)))
-        .willOpenPayment(PaymentResult.Form(PAYMENT_FORM))
-        .willPay(PayResult.Rejected(PAYMENT_FORM, listOf("Please check your card number")))
-    val model = viewModel(api, stores)
-    val opened = StoredPayment(CARD.method, cvv = null)
-
-    model.rent(REQUEST)
-    model.submitLogin("rider@example.com", "hunter2")
-    model.settled { it.account != null }
-    model.rent(REQUEST)
-    model.settled { it.flow is HireFlow.NeedsAccess }
-    model.chooseAccess(SINGLE)
-    model.settled { it.flow is HireFlow.Paying && it.savedMethods.isNotEmpty() }
-    model.edit(SAVED, opened)
-    assertEquals(opened, model.state.value.draft)
-    model.pay(CARD, (model.state.value.flow as HireFlow.Paying).save)
-
-    val state = model.settled { (it.flow as? HireFlow.Paying)?.errors?.isNotEmpty() == true }
-    assertEquals(SAVED.id, (state.flow as HireFlow.Paying).savedAs)
-    assertEquals(listOf(SAVED.id), state.savedMethods.map(SavedPaymentMethod::id))
   }
 
   @Test
@@ -532,19 +332,6 @@ class HireViewModelTest {
     assertEquals(HireFlow.Bought(REQUEST), model.state.value.flow)
     assertTrue(model.state.value.bought(STATION))
     assertEquals(listOf("login(rider@example.com)", "hire(001023)"), api.calls)
-  }
-
-  @Test
-  fun `forgetting a payment method removes only that one`() = runTest {
-    val stores = stores(backgroundScope)
-    val other = SAVED.copy(id = PaymentMethodId("method-2"), name = "Work card")
-    stores.third.put(SAVED)
-    stores.third.put(other)
-    val model = viewModel(FakeApi(), stores)
-
-    model.forgetMethod(SAVED.id)
-
-    assertEquals(listOf(other), model.settled { it.savedMethods == listOf(other) }.savedMethods)
   }
 
   @Test

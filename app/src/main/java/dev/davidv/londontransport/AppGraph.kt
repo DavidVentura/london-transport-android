@@ -8,8 +8,6 @@ import androidx.datastore.preferences.preferencesDataStoreFile
 import dev.davidv.londontransport.data.AccountStore
 import dev.davidv.londontransport.data.ActiveHireStore
 import dev.davidv.londontransport.data.FavouritesStore
-import dev.davidv.londontransport.data.PaymentMethodStore
-import dev.davidv.londontransport.data.PaymentVault
 import dev.davidv.londontransport.data.PinsStore
 import dev.davidv.londontransport.data.RouteCache
 import dev.davidv.londontransport.data.SavedLinesStore
@@ -93,15 +91,6 @@ class AppGraph(context: Context) {
         context.preferencesDataStoreFile("hire")
       }
     )
-
-  val paymentMethods =
-    PaymentMethodStore(
-      PreferenceDataStoreFactory.create(scope = storeScope) {
-        context.preferencesDataStoreFile("payment_methods")
-      }
-    )
-
-  val paymentVault = PaymentVault(context)
 
   val workouts = WorkoutBroadcast(context)
 

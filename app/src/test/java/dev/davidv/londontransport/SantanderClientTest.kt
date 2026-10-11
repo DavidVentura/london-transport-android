@@ -6,14 +6,7 @@ import dev.davidv.londontransport.santander.AuthToken
 import dev.davidv.londontransport.santander.Credentials
 import dev.davidv.londontransport.santander.DeviceId
 import dev.davidv.londontransport.santander.AccessOption
-import dev.davidv.londontransport.santander.BillingAddress
-import dev.davidv.londontransport.santander.CardDetails
-import dev.davidv.londontransport.santander.CardType
-import dev.davidv.londontransport.santander.Cvv
 import dev.davidv.londontransport.santander.HireResult
-import dev.davidv.londontransport.santander.PayResult
-import dev.davidv.londontransport.santander.PaymentForm
-import dev.davidv.londontransport.santander.PaymentMethod
 import dev.davidv.londontransport.santander.SantanderClient
 import dev.davidv.londontransport.santander.UserNodeId
 import kotlinx.coroutines.test.runTest
@@ -79,37 +72,4 @@ class SantanderClientTest {
     )
   }
 
-  @Test
-  fun `a card the backend cannot register keeps its message and the form to retry on`() = runTest {
-    val message =
-      "Sorry, there's a problem with your registration: " +
-        "Root.ConsoleV1.Bike.BikeException.InvalidFormatException"
-    server.enqueue(
-      MockResponse()
-        .setBody("""[{"Type":"Node.Internal.SimpleResponse","ID":"r","Name":"$message"}]""")
-    )
-    val form =
-      PaymentForm(
-        title = "Payment details - Single",
-        cardholder = "Rider Name",
-        cardTypes = listOf(CardType("Visa", "Visa")),
-        autopay = false,
-        submitUri = "part://Clients.TfL.EBikePhase2.TSUF.GenerateLCHSPaymentDetails?postback=submit",
-      )
-    val card =
-      CardDetails(
-        PaymentMethod(
-          cardholder = "Rider Name",
-          type = CardType("Visa", "Visa"),
-          number = "4111111111111111",
-          expiryMonth = "01",
-          expiryYear = "30",
-          address = BillingAddress("1", "River Street", "London", "", "United Kingdom", "EC1R 1XX"),
-          autopay = false,
-        ),
-        Cvv("123"),
-      )
-
-    assertEquals(PayResult.Rejected(form, listOf(message)), client().pay(CREDENTIALS, form, card))
-  }
 }
