@@ -11,3 +11,4 @@
 /unsigned
 /signed
 *.jks
+/.local-secrets/

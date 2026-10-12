@@ -6,13 +6,10 @@ import javax.crypto.Cipher
 import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
-const val SANTANDER_BASE = "https://ce-a24.corethree.net/"
+const val SANTANDER_BASE = CoreConstants.BASE_URL
 
 /** Sent as a body field on every call; the backend routes on it rather than on the Host header. */
-const val REMOTE_HOST = "ce.corethree.net"
-
-private val CONTROL_VALS_KEY: ByteArray =
-  Base64.getDecoder().decode("diS1dUbsVQyWSRA5zhAbKJrxYmLa7hD5CVUWc4OZaRs=")
+const val REMOTE_HOST = CoreConstants.REMOTE_HOST
 
 private const val VERIFICATION_FLAG = "encryptionverificationcheck"
 
@@ -51,6 +48,7 @@ fun userAuthHeader(credentials: Credentials): String {
 
 /** The server checks the injected flag to know the payload decrypted correctly. */
 fun encryptControlVals(fields: Map<String, String>): String {
+  val key = Base64.getDecoder().decode(CoreConstants.CONTROL_VALS_KEY_BASE64)
   val form =
     (fields + (VERIFICATION_FLAG to "1"))
       .map { (key, value) -> "${percentEncode(key)}=${percentEncode(value)}" }
@@ -59,8 +57,8 @@ fun encryptControlVals(fields: Map<String, String>): String {
     Cipher.getInstance("AES/CBC/PKCS5Padding").apply {
       init(
         Cipher.ENCRYPT_MODE,
-        SecretKeySpec(CONTROL_VALS_KEY, "AES"),
-        IvParameterSpec(CONTROL_VALS_KEY.copyOf(16)),
+        SecretKeySpec(key, "AES"),
+        IvParameterSpec(key.copyOf(16)),
       )
     }
   return Base64.getEncoder().encodeToString(cipher.doFinal(form.toByteArray(Charsets.UTF_8)))

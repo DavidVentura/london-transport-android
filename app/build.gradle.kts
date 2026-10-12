@@ -1,7 +1,47 @@
+import java.util.Properties
+
 plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.compose.compiler)
   alias(libs.plugins.kotlin.serialization)
+}
+
+val santanderSecrets = rootProject.layout.projectDirectory.dir(".local-secrets/santander")
+abstract class GenerateThreeDsConstants : DefaultTask() {
+  @get:InputFile
+  abstract val profileFile: RegularFileProperty
+
+  @get:OutputDirectory
+  abstract val outputDirectory: DirectoryProperty
+
+  @TaskAction
+  fun generate() {
+    val profile = Properties().apply {
+      profileFile.get().asFile.inputStream().use(::load)
+    }
+    fun constant(name: String): String {
+      val value = profile.getProperty(name) ?: throw GradleException("Missing local Santander profile property: $name")
+      if (value.isBlank()) throw GradleException("Empty local Santander profile property: $name")
+      return value.replace("\\", "\\\\").replace("\"", "\\\"").replace("$", "\\$").replace("\n", "\\n").replace("\r", "\\r")
+    }
+    val properties = listOf("SDK_REFERENCE_NUMBER", "SDK_PACKAGE", "SDK_VERSION", "SDK_SOURCE_VERSION_CODE", "SDK_CAPTURED_DATE")
+    val name = "ThreeDsLocalConstants"
+    val output = outputDirectory.get().file("dev/davidv/londontransport/local/$name.kt").asFile
+    output.parentFile.mkdirs()
+    output.writeText("package dev.davidv.londontransport.local\n\nobject $name {\n" +
+      properties.joinToString("\n") { "  const val $it = \"${constant(it)}\"" } + "\n}\n")
+  }
+}
+
+val generateLocalConstants = tasks.register<GenerateThreeDsConstants>("generateThreeDsLocalConstants") {
+  profileFile.set(santanderSecrets.file("profile.properties"))
+  outputDirectory.set(layout.buildDirectory.dir("generated/three-ds-local"))
+}
+
+androidComponents {
+  onVariants(selector().withBuildType("debug")) { variant ->
+    variant.sources.java?.addGeneratedSourceDirectory(generateLocalConstants, GenerateThreeDsConstants::outputDirectory)
+  }
 }
 
 // The keystore password is read from ~/.gradle/gradle.properties rather than the environment,
@@ -19,6 +59,9 @@ val devKeystorePassword: String? =
     }
 
 android {
+  sourceSets {
+    getByName("debug").resources.srcDir(santanderSecrets.dir("resources").asFile)
+  }
   namespace = "dev.davidv.londontransport"
   compileSdk = 36
   buildToolsVersion = "36.0.0"
@@ -121,10 +164,12 @@ dependencies {
   implementation(libs.kotlinx.serialization.json)
   implementation(libs.okhttp)
   implementation(libs.osmdroid.android)
+  debugImplementation(libs.nimbus.jose)
 
   testImplementation(libs.junit)
   testImplementation(libs.kotlinx.coroutines.test)
   testImplementation(libs.okhttp.mockwebserver)
+  testDebugImplementation(libs.bouncycastle.pkix)
 
   androidTestImplementation(libs.androidx.compose.ui.test.junit4)
   debugImplementation(libs.androidx.compose.ui.test.manifest)

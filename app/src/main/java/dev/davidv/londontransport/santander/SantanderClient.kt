@@ -4,11 +4,11 @@ import android.util.Log
 import dev.davidv.londontransport.domain.PointName
 import dev.davidv.londontransport.domain.TerminalName
 import java.io.IOException
+import java.time.Instant
 import kotlin.time.TimeSource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
-import okhttp3.FormBody
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
@@ -64,8 +64,6 @@ interface SantanderApi {
   ): VerifyResult
 }
 
-private const val USER_AGENT = "Core/642 (Android; LE2123; Android 14; uk.gov.tfl.cyclehire)"
-private const val DIAGNOSTICS = """{"nodestore":"count":"0","bytelength":"0"}"""
 private val RETRYABLE = setOf(502, 503, 504)
 private const val ATTEMPTS = 6
 
@@ -208,26 +206,7 @@ class SantanderClient(
     controlVals: Map<String, String>? = null,
   ): Reply =
     withContext(Dispatchers.IO) {
-      val body =
-        FormBody.Builder()
-          .add("c3-clienttime", (System.currentTimeMillis() / 1000).toString())
-          .add("c3-deviceid", deviceId.value)
-          .add("RemoteHost", REMOTE_HOST)
-          .apply { controlVals?.let { add("c3-controlvals", encryptControlVals(it)) } }
-          .build()
-
-      val request =
-        Request.Builder()
-          .url(url)
-          .post(body)
-          .header("User-agent", USER_AGENT)
-          .header("format", "flatjson")
-          .header("c3-userauth", credentials?.let(::userAuthHeader).orEmpty())
-          .header("c3-capabilities", "")
-          .header("c3-language", "English")
-          .header("c3-diagnostics", DIAGNOSTICS)
-          .apply { if (controlVals != null) header("c3-applysensitivedatacheck", "y") }
-          .build()
+      val request = buildCoreRequest(url, deviceId, credentials, controlVals, Instant.now())
 
       val text = send(request)
       // Only authenticated calls are kept: the unauthenticated ones are the login, whose reply is the token.

@@ -10,6 +10,7 @@ import dev.davidv.londontransport.santander.partUriToUrl
 import dev.davidv.londontransport.santander.parseNodeReply
 import dev.davidv.londontransport.santander.userAuthHeader
 import java.util.Base64
+import dev.davidv.londontransport.santander.CoreConstants
 import javax.crypto.Cipher
 import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
@@ -18,15 +19,13 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-private const val BASE = "https://ce-a24.corethree.net/"
-
-private val KEY: ByteArray =
-  Base64.getDecoder().decode("diS1dUbsVQyWSRA5zhAbKJrxYmLa7hD5CVUWc4OZaRs=")
+private const val BASE = "https://processor.example/"
 
 private fun decryptControlVals(encrypted: String): String {
+  val key = Base64.getDecoder().decode(CoreConstants.CONTROL_VALS_KEY_BASE64)
   val cipher =
     Cipher.getInstance("AES/CBC/PKCS5Padding").apply {
-      init(Cipher.DECRYPT_MODE, SecretKeySpec(KEY, "AES"), IvParameterSpec(KEY.copyOf(16)))
+      init(Cipher.DECRYPT_MODE, SecretKeySpec(key, "AES"), IvParameterSpec(key.copyOf(16)))
     }
   return String(cipher.doFinal(Base64.getDecoder().decode(encrypted)))
 }
