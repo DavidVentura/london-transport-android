@@ -92,6 +92,7 @@ fun FeatureMap(
       controller.setCenter(GeoPoint(initialCamera.center.latitude, initialCamera.center.longitude))
       overlays.add(routeOverlay)
       overlays.add(overlay)
+      overlays.add(QuickZoomOverlay(context, this))
       addMapListener(
         object : MapListener {
           override fun onScroll(event: ScrollEvent?): Boolean = report()
