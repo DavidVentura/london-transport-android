@@ -165,6 +165,7 @@ dependencies {
   implementation(libs.okhttp)
   implementation(libs.osmdroid.android)
   debugImplementation(libs.nimbus.jose)
+  debugImplementation(libs.androidx.biometric)
 
   testImplementation(libs.junit)
   testImplementation(libs.kotlinx.coroutines.test)

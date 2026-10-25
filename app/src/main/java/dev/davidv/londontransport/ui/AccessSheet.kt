@@ -12,7 +12,7 @@ import androidx.compose.ui.unit.dp
 import dev.davidv.londontransport.santander.WebsitePass
 
 @Composable
-fun AccessSheet(onBuyOnWebsite: (WebsitePass) -> Unit) {
+fun AccessSheet(onBuyOnWebsite: (WebsitePass) -> Unit, nativePurchase: @Composable () -> Unit) {
   Column(modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, bottom = 32.dp)) {
     Text("No active subscription", style = MaterialTheme.typography.headlineSmall)
     Text(
@@ -21,6 +21,7 @@ fun AccessSheet(onBuyOnWebsite: (WebsitePass) -> Unit) {
       color = MaterialTheme.colorScheme.onSurfaceVariant,
       modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
     )
+    nativePurchase()
     WebsitePass.entries.forEach { pass ->
       OutlinedButton(
         onClick = { onBuyOnWebsite(pass) },

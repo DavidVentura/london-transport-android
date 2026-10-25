@@ -3,6 +3,7 @@ package dev.davidv.londontransport.threeds
 import dev.davidv.londontransport.santander.Credentials
 import dev.davidv.londontransport.santander.DeviceId
 import dev.davidv.londontransport.santander.buildCoreRequest
+import dev.davidv.londontransport.santander.partUriToUrl
 import java.security.cert.TrustAnchor
 import java.time.Instant
 import okhttp3.FormBody
@@ -20,7 +21,9 @@ data class PaymentRequestContext(val base: HttpUrl, val deviceId: DeviceId, val 
 class PaymentContinuationTarget private constructor(val url: HttpUrl, val data: PaymentTransactionData) {
   companion object {
     fun resolve(continuation: PaymentContinuation, base: HttpUrl): ProtocolResult<PaymentContinuationTarget> = protocolBoundary {
-      val url = requireNotNull(base.resolve(continuation.callback.value))
+      val callback = continuation.callback.value
+      val target = if (callback.startsWith("part://")) partUriToUrl(callback, base.toString()) else callback
+      val url = requireNotNull(base.resolve(target))
       require(url.scheme == base.scheme && url.host == base.host && url.port == base.port)
       require(url.username.isEmpty() && url.password.isEmpty() && url.fragment == null)
       require("ChallengeFailed" !in url.queryParameterNames)

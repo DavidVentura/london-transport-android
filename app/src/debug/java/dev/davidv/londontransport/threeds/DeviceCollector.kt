@@ -119,7 +119,7 @@ fun deviceInformation(facts: AndroidDeviceFacts): DeviceInformation {
   ), unavailable, warnings)
 }
 
-@JvmInline value class SigningCertificateFingerprint(val value: String) {
+@JvmInline @kotlinx.serialization.Serializable value class SigningCertificateFingerprint(val value: String) {
   init { require(value.matches(Regex("[a-f0-9]{64}"))) }
 }
 
@@ -159,7 +159,7 @@ class AndroidDeviceCollector(private val context: Context, private val expectedS
   private fun basicFacts(api: Int): AndroidBasicFacts {
     val manager = context.packageManager
     val installer = try {
-      if (api >= 30) manager.getInstallSourceInfo(context.packageName).installingPackageName
+      if (Build.VERSION.SDK_INT >= 30) manager.getInstallSourceInfo(context.packageName).installingPackageName
       else manager.getInstallerPackageName(context.packageName)
     } catch (e: PackageManager.NameNotFoundException) {
       throw ProtocolException(ProtocolFault.InvalidState)

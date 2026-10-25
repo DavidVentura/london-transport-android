@@ -5,6 +5,40 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import okhttp3.FormBody
 import okhttp3.Request
+import dev.davidv.londontransport.santander.NodeReply
+import dev.davidv.londontransport.santander.PaymentForm
+import dev.davidv.londontransport.santander.PaymentPage
+import dev.davidv.londontransport.santander.parseNodeReply
+import dev.davidv.londontransport.santander.parsePaymentPage
+
+sealed interface CardSubmissionReply {
+  data class Authentication(val authentication: PaymentAuthentication) : CardSubmissionReply
+  data class Rejected(val form: PaymentForm, val errors: List<String>) : CardSubmissionReply
+  data class Refused(val message: String) : CardSubmissionReply
+}
+
+fun parseCardSubmissionReply(body: String): ProtocolResult<CardSubmissionReply> = protocolBoundary {
+  require(body.length <= 512_000)
+  val nodes = Json { ignoreUnknownKeys = true }.decodeFromString<List<PaymentResponseNode>>(body)
+  if (nodes.any { it.type == "Node.Internal.SimpleResponse" && (it.tags.deserialize != null || it.tags.callback != null) }) {
+    return@protocolBoundary when (val result = parsePaymentAuthentication(body)) {
+      is ProtocolResult.Success -> CardSubmissionReply.Authentication(result.value)
+      is ProtocolResult.Failure -> throw ProtocolException(result.fault)
+    }
+  }
+  when (val reply = parseNodeReply(body)) {
+    is NodeReply.Rejected -> CardSubmissionReply.Refused(reply.message)
+    is NodeReply.Malformed -> throw ProtocolException(ProtocolFault.MalformedInput)
+    is NodeReply.Nodes -> when (val page = parsePaymentPage(reply.nodes)) {
+      is PaymentPage.Form -> {
+        require(page.errors.isNotEmpty())
+        CardSubmissionReply.Rejected(page.form, page.errors)
+      }
+      is PaymentPage.Refused -> CardSubmissionReply.Refused(page.message)
+      is PaymentPage.Malformed -> throw ProtocolException(ProtocolFault.MalformedInput)
+    }
+  }
+}
 
 fun buildCardSubmissionRequest(core: Request, authentication: AuthenticationParameters): ProtocolResult<Request> = protocolBoundary {
   val form = core.body as? FormBody ?: throw ProtocolException(ProtocolFault.MalformedInput)

@@ -283,7 +283,9 @@ fun CyclesApp(
         onDismissRequest = hireViewModel::dismiss,
         sheetState = rememberModalBottomSheetState(),
       ) {
-        AccessSheet(onBuyOnWebsite = hireViewModel::buyOnWebsite)
+        AccessSheet(onBuyOnWebsite = hireViewModel::buyOnWebsite) {
+          NativeAccessPurchase(flow) { result -> hireViewModel.nativePaymentCompleted(flow, result) }
+        }
       }
     is HireFlow.Verify ->
       VerifyDialog(

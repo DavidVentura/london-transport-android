@@ -308,7 +308,10 @@ class HireViewModelTest {
     model.rent(REQUEST)
 
     val state = model.settled { it.flow is HireFlow.NeedsAccess }
-    assertEquals(HireFlow.NeedsAccess(REQUEST), state.flow)
+    val needs = state.flow as HireFlow.NeedsAccess
+    assertEquals(REQUEST, needs.request)
+    assertEquals(CREDENTIALS, needs.credentials)
+    assertEquals(listOf(SINGLE), needs.options)
     assertNull(state.failure(STATION))
   }
 
@@ -350,6 +353,32 @@ class HireViewModelTest {
     val state = model.settled { it.flow is HireFlow.Failed }
     assertEquals("Sorry, but there are no bikes available at this location.", state.failure(STATION))
     assertNull(state.failure(FeatureKey(LayerId("santander-cycles"), FeatureId("BikePoints_2"))))
+  }
+
+  @Test
+  fun `native continuation preserves a release code without making another hire request and ignores an older purchase`() = runTest {
+    val api = FakeApi().willLogin(LoginResult.Success(CREDENTIALS))
+      .willHire(HireResult.AccessNeeded(listOf(SINGLE)))
+      .willHire(HireResult.AccessNeeded(listOf(SINGLE)))
+    val workouts = FakeWorkouts()
+    val model = viewModel(api, stores(backgroundScope), workouts)
+    model.rent(REQUEST)
+    model.submitLogin("rider@example.com", "hunter2")
+    model.settled { it.account != null }
+    model.rent(REQUEST)
+    val previous = model.settled { it.flow is HireFlow.NeedsAccess }.flow as HireFlow.NeedsAccess
+    model.dismiss()
+    model.rent(REQUEST)
+    val current = model.settled { it.flow is HireFlow.NeedsAccess }.flow as HireFlow.NeedsAccess
+    assertTrue(previous.purchaseId != current.purchaseId)
+    model.nativePaymentCompleted(previous, released())
+    assertNull(model.state.value.active)
+    assertEquals(current, model.state.value.flow)
+    model.nativePaymentCompleted(current, released())
+    val completed = model.settled { it.active != null && it.flow == HireFlow.Idle }
+    assertEquals(ReleaseCode("13212"), checkNotNull(completed.active).code)
+    assertEquals(1, workouts.starts)
+    assertEquals(listOf("login(rider@example.com)", "hire(001023)", "hire(001023)"), api.calls)
   }
 
   @Test

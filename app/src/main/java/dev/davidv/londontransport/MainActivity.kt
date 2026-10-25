@@ -1,7 +1,6 @@
 package dev.davidv.londontransport
 
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -13,7 +12,7 @@ import dev.davidv.londontransport.ui.HireViewModel
 import dev.davidv.londontransport.ui.RoutesViewModel
 import dev.davidv.londontransport.ui.LondonTransportTheme
 
-class MainActivity : ComponentActivity() {
+class MainActivity : PaymentHostActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     enableEdgeToEdge()

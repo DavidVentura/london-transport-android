@@ -34,10 +34,13 @@ import java.security.interfaces.ECPublicKey
 import java.security.interfaces.RSAPublicKey
 import java.security.spec.ECGenParameterSpec
 import java.time.Instant
+import java.time.Clock
+import java.time.ZoneOffset
 import java.util.Date
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
+import kotlinx.coroutines.runBlocking
 import javax.net.ssl.KeyManagerFactory
 import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManagerFactory
@@ -209,6 +212,41 @@ class ThreeDsPrototypeTest {
       assertEquals("01", params.formFields().getValue("sdkInterface"))
       assertEquals(7, params.formFields().size)
       assertNotEquals(params.encryptedDeviceData, authentication(first, bank).encryptedDeviceData)
+    }
+  }
+
+  @Test fun `runtime dispatches OTP and frictionless paths and consumes each submission and continuation once`() = runBlocking {
+    listOf("/payment-authenticate", "/payment-frictionless").forEach { path ->
+      SimulatedBank(now, reference).use { bank ->
+        val transaction = SdkTransaction.create(appId, reference)
+        val context = PaymentRequestContext(bank.server.url("/"), DeviceId("offline-device"),
+          Credentials(UserNodeId("offline-user"), AuthToken("offline-token")))
+        val core = buildCoreRequest(bank.server.url(path), context.deviceId, context.credentials,
+          mapOf("member_card_number" to "4111111111111111", "member_card_cvv" to "123"), now)
+        val prepared = success(PreparedCardSubmission.create(core,
+          PreparedAuthentication(transaction, authentication(transaction, bank), bank.roots), context))
+        val runtime = PaymentRuntime(bank.client, Clock.fixed(now, ZoneOffset.UTC))
+        val handoff = (runtime.submit(prepared) as PaymentRuntimeResult.Success).value
+        assertEquals(PaymentRuntimeResult.Failure(PaymentRuntimeFault.AlreadySent), runtime.submit(prepared))
+        val continuation = when (handoff) {
+          is RuntimePaymentStep.Continue -> handoff.pending
+          is RuntimePaymentStep.Challenge -> {
+            val prompt = (handoff.session.send(ChallengeAction.Start) as PaymentRuntimeResult.Success).value as RuntimePaymentStep.Prompt
+            assertEquals("Verification code", prompt.prompt.label)
+            val completed = (handoff.session.send(ChallengeAction.Answer(OtpAnswer("123456"))) as PaymentRuntimeResult.Success).value as RuntimePaymentStep.Completed
+            assertEquals(PaymentChallengeCompletion.Authenticated, completed.outcome)
+            assertEquals(PaymentRuntimeResult.Failure(PaymentRuntimeFault.Protocol(ProtocolFault.InvalidState)),
+              handoff.session.send(ChallengeAction.Answer(OtpAnswer("123456"))))
+            completed.pending
+          }
+          else -> error("Unexpected runtime handoff")
+        }
+        val reply = (runtime.continuePayment(continuation) as PaymentRuntimeResult.Success).value as NodeReply.Nodes
+        assertEquals("offline continuation accepted", simpleResponse(reply.nodes))
+        assertEquals(PaymentRuntimeResult.Failure(PaymentRuntimeFault.AlreadySent), runtime.continuePayment(continuation))
+        assertEquals(if (path == "/payment-authenticate") 4 else 2, bank.server.requestCount)
+        bank.failure.get()?.let { throw AssertionError("simulated runtime flow failed", it) }
+      }
     }
   }
 

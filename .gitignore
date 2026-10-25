@@ -12,3 +12,4 @@
 /signed
 *.jks
 /.local-secrets/
+/.kotlin/

@@ -9,6 +9,7 @@ import dev.davidv.londontransport.domain.FeatureKey
 import dev.davidv.londontransport.domain.HireTarget
 import dev.davidv.londontransport.domain.WorkoutSignal
 import dev.davidv.londontransport.santander.Account
+import dev.davidv.londontransport.santander.AccessOption
 import dev.davidv.londontransport.santander.Credentials
 import dev.davidv.londontransport.santander.HireResult
 import dev.davidv.londontransport.santander.LoginResult
@@ -20,6 +21,7 @@ import dev.davidv.londontransport.santander.WebsitePass
 import dev.davidv.londontransport.santander.releaseCodeExpiry
 import java.time.Clock
 import java.time.Duration
+import java.util.UUID
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,6 +35,8 @@ data class HireRequest(
   val stationName: String,
   val target: HireTarget,
 )
+
+@JvmInline value class AccessPurchaseId(val value: UUID)
 
 sealed interface HireFlow {
   data object Idle : HireFlow
@@ -54,7 +58,12 @@ sealed interface HireFlow {
     val error: String?,
   ) : HireFlow
 
-  data class NeedsAccess(val request: HireRequest) : HireFlow
+  data class NeedsAccess(
+    val request: HireRequest,
+    val credentials: Credentials,
+    val options: List<AccessOption>,
+    val purchaseId: AccessPurchaseId,
+  ) : HireFlow
 
   data class BuyingOnWebsite(val request: HireRequest, val pass: WebsitePass) : HireFlow
 
@@ -200,7 +209,9 @@ class HireViewModel(
         }
       // The options Begin lists can only be bought with the card SDK the official app ships, so
       // the website sells the access instead.
-      is HireResult.AccessNeeded -> _state.update { it.copy(flow = HireFlow.NeedsAccess(request)) }
+      is HireResult.AccessNeeded -> _state.update {
+        it.copy(flow = HireFlow.NeedsAccess(request, credentials, result.options, AccessPurchaseId(UUID.randomUUID())))
+      }
       is HireResult.Refused -> fail(request, result.message)
       HireResult.LoggedOut -> askLogin(request, storedEmail(), LOGGED_OUT)
       is HireResult.Unavailable -> fail(request, unreachable(result.reason))
@@ -253,6 +264,11 @@ class HireViewModel(
   fun purchaseCompleted() {
     val buying = _state.value.flow as? HireFlow.BuyingOnWebsite ?: return
     _state.update { it.copy(flow = HireFlow.Bought(buying.request)) }
+  }
+
+  fun nativePaymentCompleted(needs: HireFlow.NeedsAccess, result: HireResult) {
+    if (_state.value.flow != needs) return
+    viewModelScope.launch { settle(needs.request, needs.credentials, result) }
   }
 
   fun dismiss() {

@@ -11,7 +11,11 @@ sealed interface PreparationResult {
   data class Success(val authentication: PreparedAuthentication) : PreparationResult
   data class Failure(val fault: PreparationFault) : PreparationResult
 }
-class PreparedAuthentication internal constructor(val transaction: SdkTransaction, val parameters: AuthenticationParameters)
+class PreparedAuthentication internal constructor(
+  val transaction: SdkTransaction,
+  val parameters: AuthenticationParameters,
+  internal val challengeRoots: Set<java.security.cert.TrustAnchor>,
+)
 
 class AuthenticationPrototype(
   private val appId: SdkAppId,
@@ -41,6 +45,6 @@ class AuthenticationPrototype(
       is ProtocolResult.Failure -> return PreparationResult.Failure(PreparationFault.Encryption(result.fault))
     }
     val parameters = AuthenticationParameters(transaction.appId, transaction.id, transaction.reference, transaction.publicKey, encrypted)
-    return PreparationResult.Success(PreparedAuthentication(transaction, parameters))
+    return PreparationResult.Success(PreparedAuthentication(transaction, parameters, configuration.challengeRoots))
   }
 }

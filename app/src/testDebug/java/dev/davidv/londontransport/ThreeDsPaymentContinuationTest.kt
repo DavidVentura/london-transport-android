@@ -46,13 +46,17 @@ class ThreeDsPaymentContinuationTest {
   @Test fun `cross origin credential exfiltration fragments userinfo and ambiguous failure flags are rejected`() {
     listOf("https://attacker.example/steal", "//attacker.example/steal", "http://processor.example/cleartext",
       "https://processor.example:444/other-port", "https://user:pass@processor.example/path", "Continue#fragment",
-      "Continue?ChallengeFailed=0", "Continue?ChallengeFailed=1&ChallengeFailed=0", "part://Clients.TfL.Continue",
+      "Continue?ChallengeFailed=0", "Continue?ChallengeFailed=1&ChallengeFailed=0", "ftp://processor.example/Continue",
     ).forEach { callback ->
       assertEquals(callback, ProtocolResult.Failure(ProtocolFault.MalformedInput),
         PaymentContinuationTarget.resolve(PaymentContinuation(PaymentCallback(callback), data), context.base))
     }
     assertTrue(PaymentContinuationTarget.resolve(PaymentContinuation(PaymentCallback("https://processor.example/Continue"), data), context.base)
       is ProtocolResult.Success)
+    val part = PaymentContinuationTarget.resolve(PaymentContinuation(PaymentCallback("part://Clients.TfL.Continue?existing=a%2Bb"), data), context.base)
+      as ProtocolResult.Success
+    assertEquals("/Clients/TfL/Continue", part.value.url.encodedPath)
+    assertEquals("a+b", part.value.url.queryParameter("existing"))
   }
 
   @Test fun `frictionless and declined statuses both require server continuation without a challenge failure flag`() {

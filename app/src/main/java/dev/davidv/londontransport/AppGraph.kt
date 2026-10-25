@@ -24,6 +24,7 @@ import dev.davidv.londontransport.map.configureOsmdroid
 import dev.davidv.londontransport.santander.DeviceId
 import dev.davidv.londontransport.santander.SantanderClient
 import dev.davidv.londontransport.santander.replyRecorder
+import dev.davidv.londontransport.ui.createNativePaymentGraph
 import java.io.File
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
@@ -98,7 +99,7 @@ class AppGraph(context: Context) {
    * The hire backend trusts a device id once it has been verified by SMS, so this has to be the same
    * string on every run.
    */
-  private val deviceId =
+  val deviceId =
     DeviceId(
       checkNotNull(
         Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID)
@@ -106,6 +107,8 @@ class AppGraph(context: Context) {
         "the device has no ANDROID_ID"
       }
     )
+
+  val nativePayments = createNativePaymentGraph(context, storeScope)
 
   val santander =
     SantanderClient(

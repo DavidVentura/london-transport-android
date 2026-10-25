@@ -234,6 +234,7 @@ class ConfigurationRefresher(
 class HttpsConfigurationTransport private constructor(
   private val endpoint: HttpUrl, private val client: OkHttpClient,
   private val identity: RefreshIdentity, private val apiKey: RefreshApiKey,
+  private val trace: PaymentTrace,
 ) : ConfigurationTransport {
   override fun fetch(request: RefreshRequest): RefreshResult<ConfigurationDownload> {
     val body = RefreshWireRequest(apiKey.value, identity.packageName.value, identity.appId.value,
@@ -242,7 +243,7 @@ class HttpsConfigurationTransport private constructor(
       .header("X-Request-ID", UUID.randomUUID().toString())
       .post(Json.encodeToString(body).toRequestBody("application/json".toMediaType())).build()
     return try {
-      client.newCall(http).execute().use { response ->
+      executePaymentHttp(client, http, 512 * 1024L, trace, PaymentHttpStage.Configuration).use { response ->
         if (response.code == 304) {
           if (request.contentHash.isEmpty()) return RefreshResult.Failure(RefreshFault.InvalidResponse)
           return RefreshResult.Success(ConfigurationDownload.NotModified)
@@ -272,7 +273,7 @@ class HttpsConfigurationTransport private constructor(
 
   companion object {
     fun create(endpoint: HttpUrl, credentials: KeyStore, credentialPassword: CharArray, trust: RefreshTrust,
-      identity: RefreshIdentity, apiKey: RefreshApiKey): ProtocolResult<HttpsConfigurationTransport> = protocolBoundary {
+      identity: RefreshIdentity, apiKey: RefreshApiKey, trace: PaymentTrace = PaymentTrace.Disabled): ProtocolResult<HttpsConfigurationTransport> = protocolBoundary {
       require(endpoint.isHttps && endpoint.username.isEmpty() && endpoint.password.isEmpty() && endpoint.query == null && endpoint.fragment == null)
       require(credentials.aliases().toList().any { credentials.isKeyEntry(it) && credentials.getCertificateChain(it)?.isNotEmpty() == true })
       val managers = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm()).apply { init(credentials, credentialPassword) }
@@ -286,7 +287,7 @@ class HttpsConfigurationTransport private constructor(
       val client = OkHttpClient.Builder().sslSocketFactory(tls.socketFactory, manager)
         .followRedirects(false).followSslRedirects(false).retryOnConnectionFailure(false)
         .callTimeout(java.time.Duration.ofSeconds(30)).build()
-      HttpsConfigurationTransport(endpoint, client, identity, apiKey)
+      HttpsConfigurationTransport(endpoint, client, identity, apiKey, trace)
     }
   }
 }
