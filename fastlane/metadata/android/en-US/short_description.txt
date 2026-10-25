@@ -1,1 +1,1 @@
-Shows transport (Tube, Bus, Cycle) in London
+Lets you rent a Santander cycle and shows transport (Tube, Bus) in London

@@ -1,6 +1,6 @@
-This app shows
-- Tube lines
-- Bus lines
-- Santander Cycles stations
+This app lets you hire a bike with your Santander Cycles account. 
 
-It also lets you hire a bike with your Santander Cycles account.
+It also shows:
+
+- Tube stations and lines
+- Bus stops and lines
