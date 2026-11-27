@@ -34,6 +34,9 @@ enum class AvailabilityLevel {
 
 data class DetailRow(val label: String, val value: String)
 
+/** A headline count, shown large; [DetailRow]s are for secondary facts. */
+data class Stat(val label: String, val value: Int)
+
 sealed interface MarkerStyle {
   data object Dot : MarkerStyle
 
@@ -51,5 +54,5 @@ data class MapFeature(
   val summary: String,
   val details: List<DetailRow>,
   val marker: MarkerStyle = MarkerStyle.Dot,
-  val hire: HireTarget? = null,
+  val stats: List<Stat> = emptyList(),
 )

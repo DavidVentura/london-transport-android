@@ -9,7 +9,6 @@ import dev.davidv.londontransport.domain.Station
 import dev.davidv.londontransport.domain.StationId
 import dev.davidv.londontransport.domain.StationState
 import dev.davidv.londontransport.domain.StationStatus
-import dev.davidv.londontransport.domain.TerminalName
 import dev.davidv.londontransport.layers.stationFeature
 import java.io.File
 import kotlinx.coroutines.test.runTest
@@ -22,14 +21,12 @@ import org.junit.rules.TemporaryFolder
 private val live =
   Station(
     id = StationId("BikePoints_1"),
-    terminal = TerminalName("001023"),
     name = "River Street, Clerkenwell",
     position = LatLon(51.529163, -0.10997),
     status =
       StationStatus.Live(
         bikes = BikeCounts(standard = 7, electric = 2),
         emptyDocks = 3,
-        capacity = 14,
         state = StationState.OPERATIONAL,
       ),
   )

@@ -1,523 +1,370 @@
 package dev.davidv.londontransport
 
-import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
-import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.lifecycle.ViewModelStore
 import dev.davidv.londontransport.data.AccountStore
-import dev.davidv.londontransport.data.ActiveHireStore
-import dev.davidv.londontransport.domain.ActiveHire
-import dev.davidv.londontransport.domain.FeatureId
-import dev.davidv.londontransport.domain.FeatureKey
-import dev.davidv.londontransport.domain.HireTarget
-import dev.davidv.londontransport.domain.LayerId
-import dev.davidv.londontransport.domain.PointName
-import dev.davidv.londontransport.domain.ReleaseCode
-import dev.davidv.londontransport.domain.TerminalName
 import dev.davidv.londontransport.domain.WorkoutSignal
-import dev.davidv.londontransport.santander.AccessOption
-import dev.davidv.londontransport.santander.AuthToken
-import dev.davidv.londontransport.santander.Credentials
-import dev.davidv.londontransport.santander.HireCode
-import dev.davidv.londontransport.santander.HireResult
-import dev.davidv.londontransport.santander.LoginResult
-import dev.davidv.londontransport.santander.Password
-import dev.davidv.londontransport.santander.SantanderApi
-import dev.davidv.londontransport.santander.SmsChallenge
-import dev.davidv.londontransport.santander.UserNodeId
-import dev.davidv.londontransport.santander.VerifyResult
-import dev.davidv.londontransport.santander.WebsitePass
+import dev.davidv.londontransport.santander.*
 import dev.davidv.londontransport.ui.HireFlow
-import dev.davidv.londontransport.ui.HireRequest
-import dev.davidv.londontransport.ui.HireState
+import dev.davidv.londontransport.ui.LoginPurpose
+import dev.davidv.londontransport.ui.RideState
 import dev.davidv.londontransport.ui.HireViewModel
 import java.io.File
-import java.time.Clock
 import java.time.Instant
-import java.time.LocalTime
-import java.time.ZoneOffset
-import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.setMain
 import org.junit.After
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
+import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
-private val STATION = FeatureKey(LayerId("santander-cycles"), FeatureId("BikePoints_1"))
+private val SESSION = PolarisSession(MemberId("member"), PolarisToken("token"))
+private val ACCOUNT = Account("rider@example.test", Password("password"), SESSION)
+private val BIKE = checkNotNull(QrCode.parse("ABDRDO"))
 
-private val REQUEST =
-  HireRequest(
-    station = STATION,
-    stationName = "River Street, Clerkenwell",
-    target = HireTarget(TerminalName("001023"), PointName("River Street, Clerkenwell")),
-  )
-
-private val CHALLENGE =
-  SmsChallenge(
-    verifyUri = "part://Clients.TfL.GenerateLCHSMembershipVerifyForm?Submit=1",
-    pincodeFields = listOf("lchs_pincode_1", "lchs_pincode_2"),
-    message = "We texted you a code",
-  )
-
-private val CREDENTIALS = Credentials(UserNodeId("node"), AuthToken("token"))
-
-private val SINGLE =
-  AccessOption(
-    name = "Single",
-    price = "£1.65 per person",
-    terms = listOf("30mins access"),
-    selectUri = "part://Clients.TfL.EBikePhase2.TSUF.GenerateLCHSSubscriptionPicker?action=subscribe10017",
-  )
-
-private val FRESH_CREDENTIALS = Credentials(UserNodeId("node"), AuthToken("second-token"))
-
-private val NOW: Instant = Instant.parse("2026-08-18T21:28:26Z")
-
-private class FakeApi(
-  private val logins: MutableList<LoginResult> = mutableListOf(),
-  private val hires: MutableList<HireResult> = mutableListOf(),
-  private val verifications: MutableList<VerifyResult> = mutableListOf(),
-) : SantanderApi {
+private class FakeApi : PolarisApi {
   val calls = mutableListOf<String>()
-
-  fun willLogin(vararg results: LoginResult) = apply { logins += results }
-
-  fun willHire(vararg results: HireResult) = apply { hires += results }
-
-  fun willVerify(vararg results: VerifyResult) = apply { verifications += results }
-
-  override suspend fun login(email: String, password: Password): LoginResult {
-    calls += "login($email)"
-    return logins.removeFirst()
+  val identifiers = mutableListOf<QrCode>()
+  var login: PolarisLoginResult = PolarisLoginResult.Authenticated(SESSION)
+  var verification: PolarisLoginResult = PolarisLoginResult.Authenticated(SESSION)
+  var unlock: UnlockResult = UnlockResult.Accepted
+  var ride: RideResult = RideResult.Success(null)
+  var unlockGate: CompletableDeferred<Unit>? = null
+  override suspend fun login(email: String, password: Password): PolarisLoginResult {
+    calls += "login"
+    return login
   }
-
-  override suspend fun hire(
-    credentials: Credentials,
-    terminal: TerminalName,
-    point: PointName,
-  ): HireResult {
-    calls += "hire(${terminal.value})"
-    return hires.removeFirst()
+  override suspend fun verifyLogin(challenge: LoginChallenge, code: String): PolarisLoginResult {
+    calls += "verify"
+    return verification
   }
-
-  override suspend fun verifyDevice(
-    credentials: Credentials,
-    challenge: SmsChallenge,
-    digits: String,
-  ): VerifyResult {
-    calls += "verify($digits)"
-    return verifications.removeFirst()
+  override suspend fun unlock(session: PolarisSession, bike: QrCode): UnlockResult {
+    calls += "unlock:${bike.value}"
+    identifiers += bike
+    unlockGate?.await()
+    return unlock
   }
-}
-
-private class FakeWorkouts : WorkoutSignal {
-  var starts = 0
-    private set
-
-  override fun cyclingStarted() {
-    starts += 1
+  override suspend fun continueUnlock(session: PolarisSession, continuation: UnlockContinuation): UnlockResult {
+    calls += "continue"
+    unlockGate?.await()
+    return unlock
+  }
+  override suspend fun activeRide(session: PolarisSession): RideResult {
+    calls += "ride"
+    return ride
   }
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class HireViewModelTest {
   @get:Rule val folder = TemporaryFolder()
+  private val models = ViewModelStore()
+  @Before fun setup() { Dispatchers.setMain(UnconfinedTestDispatcher()) }
+  @After fun teardown() { models.clear(); Dispatchers.resetMain() }
 
-  private val dispatcher = UnconfinedTestDispatcher()
+  private fun model(api: PolarisApi, store: AccountStore, signal: WorkoutSignal = WorkoutSignal {}) =
+    HireViewModel(api, store, signal).also { models.put("hire", it) }
 
-  @Before
-  fun useTestDispatcher() {
-    Dispatchers.setMain(dispatcher)
-  }
 
-  @After
-  fun releaseDispatcher() {
-    Dispatchers.resetMain()
-  }
-
-  private fun preferences(scope: CoroutineScope, name: String): DataStore<Preferences> =
-    PreferenceDataStoreFactory.create(scope = scope) {
-      File(folder.root, "$name.preferences_pb")
+  private fun hireTest(block: suspend TestScope.() -> Unit) = runTest {
+    try {
+      block()
+    } finally {
+      models.clear()
     }
+  }
 
-  /** One set of stores per test: two DataStores over one file refuse to run together. */
-  private fun stores(scope: CoroutineScope): Pair<AccountStore, ActiveHireStore> =
-    AccountStore(preferences(scope, "account")) to ActiveHireStore(preferences(scope, "hire"))
-
-  private fun viewModel(
-    api: SantanderApi,
-    stores: Pair<AccountStore, ActiveHireStore>,
-    workouts: WorkoutSignal = FakeWorkouts(),
-    now: Instant = NOW,
-  ) =
-    HireViewModel(api, stores.first, stores.second, workouts, Clock.fixed(now, ZoneOffset.UTC))
-
-  /**
-   * The stores write to a real file off the test dispatcher, so every step that saves lands a beat
-   * after the call that caused it. Tests wait for the state they are about to assert on.
-   */
-  private suspend fun HireViewModel.settled(step: (HireState) -> Boolean): HireState =
-    state.first(step)
-
-  private fun released(until: LocalTime? = LocalTime.of(22, 38)) =
-    HireResult.Released(HireCode(ReleaseCode("13212"), "River Street, Clerkenwell", until))
-
-  @Test
-  fun `renting without an account asks for one, and the dock is not called`() = runTest {
+  @Test fun `login never initiates an unlock`() = hireTest {
+    val store = AccountStore(PreferenceDataStoreFactory.create(scope = backgroundScope) { File(folder.root, "account.preferences_pb") })
     val api = FakeApi()
-    val model = viewModel(api, stores(backgroundScope))
-
-    model.rent(REQUEST)
-
-    assertEquals(
-      HireFlow.Login(REQUEST, email = "", busy = false, error = null),
-      model.state.value.flow,
-    )
-    assertEquals(emptyList<String>(), api.calls)
+    val model = model(api, store)
+    model.scan()
+    assertTrue(model.state.value.flow is HireFlow.Login)
+    model.submitLogin(" rider@example.test ", "password")
+    model.state.first { it.account != null && it.flow == HireFlow.Scanning && it.ride is RideState.Known }
+    assertEquals("rider@example.test", model.state.value.account?.email)
+    assertFalse(api.calls.any { it.startsWith("unlock") })
   }
 
-  @Test
-  fun `logging in logs in and stops there, without releasing a bike`() = runTest {
-    val api = FakeApi().willLogin(LoginResult.Success(CREDENTIALS))
-    val stores = stores(backgroundScope)
-    val model = viewModel(api, stores)
-
-    model.rent(REQUEST)
-    model.submitLogin(" rider@example.com ", "hunter2")
-    val settled = model.settled { it.account != null }
-
-    assertEquals(listOf("login(rider@example.com)"), api.calls)
-    assertEquals(HireFlow.Idle, settled.flow)
-    assertEquals("rider@example.com", settled.account?.email)
-    assertEquals(CREDENTIALS, stores.first.account.first()?.credentials)
-    assertNull(settled.active)
+  @Test fun `expired membership becomes access flow and never starts a workout`() = hireTest {
+    val store = AccountStore(PreferenceDataStoreFactory.create(scope = backgroundScope) { File(folder.root, "account.preferences_pb") })
+    store.save(ACCOUNT)
+    val api = FakeApi().apply { unlock = UnlockResult.AccessNeeded("Your membership has expired", "Please renew your membership") }
+    var starts = 0
+    val model = model(api, store, WorkoutSignal { starts++ })
+    model.state.first { it.account != null && it.ride is RideState.Known }
+    model.scan()
+    model.unlock(BIKE)
+    model.state.first { it.flow is HireFlow.NeedsAccess }
+    assertEquals(HireFlow.NeedsAccess("Your membership has expired", "Please renew your membership"), model.state.value.flow)
+    assertEquals(0, starts)
   }
 
-  @Test
-  fun `the tap after logging in is the one that releases a bike`() = runTest {
-    val api = FakeApi().willLogin(LoginResult.Success(CREDENTIALS)).willHire(released())
-    val model = viewModel(api, stores(backgroundScope))
-
-    model.rent(REQUEST)
-    model.submitLogin("rider@example.com", "hunter2")
-    model.settled { it.account != null }
-    model.rent(REQUEST)
-
-    assertEquals(listOf("login(rider@example.com)", "hire(001023)"), api.calls)
-    assertEquals(ReleaseCode("13212"), model.settled { it.active != null }.active?.code)
+  @Test fun `pending unlock rejects duplicate taps and cancellation`() = hireTest {
+    val store = AccountStore(PreferenceDataStoreFactory.create(scope = backgroundScope) { File(folder.root, "account.preferences_pb") })
+    store.save(ACCOUNT)
+    val gate = CompletableDeferred<Unit>()
+    val api = FakeApi().apply { unlockGate = gate }
+    val model = model(api, store)
+    model.state.first { it.account != null && it.ride is RideState.Known }
+    model.scan()
+    model.unlock(BIKE)
+    model.unlock(BIKE)
+    model.dismiss()
+    assertEquals(1, api.calls.count { it.startsWith("unlock") })
+    assertEquals(HireFlow.Unlocking(BIKE), model.state.value.flow)
+    gate.complete(Unit)
+    model.state.first { it.flow is HireFlow.UnlockAccepted }
   }
 
-  @Test
-  fun `a released code is kept against its dock until the server's deadline`() = runTest {
-    val api = FakeApi().willLogin(LoginResult.Success(CREDENTIALS)).willHire(released())
-    val stores = stores(backgroundScope)
-    val model = viewModel(api, stores)
-
-    model.rent(REQUEST)
-    model.submitLogin("rider@example.com", "hunter2")
-    model.settled { it.account != null }
-    model.rent(REQUEST)
-
-    val active = model.settled { it.active != null }.active!!
-    assertEquals(STATION, active.station)
-    assertEquals(ReleaseCode("13212"), active.code)
-    assertEquals(Instant.parse("2026-08-18T21:38:00Z"), active.expiresAt)
-    assertEquals(active, stores.second.hire.first())
+  @Test fun `restoring an active ride prevents another hire without restarting a workout`() = hireTest {
+    val store = AccountStore(PreferenceDataStoreFactory.create(scope = backgroundScope) { File(folder.root, "account.preferences_pb") })
+    store.save(ACCOUNT)
+    val api = FakeApi().apply { ride = RideResult.Success(CurrentRide(RideId("ride"), RideStatus("active"), Instant.parse("2026-11-17T18:00:00Z"), 1)) }
+    var starts = 0
+    val model = model(api, store, WorkoutSignal { starts++ })
+    model.state.first { it.active != null }
+    model.refreshRide()
+    assertEquals(0, starts)
+    model.scan()
+    assertEquals(HireFlow.UnlockFailed(null, "You already have a ride in progress."), model.state.value.flow)
+    assertFalse(api.calls.any { it.startsWith("unlock") })
   }
 
-  @Test
-  fun `a rejected login stays on the form with the reason`() = runTest {
-    val api = FakeApi().willLogin(LoginResult.Rejected("Those details were not accepted."))
-    val model = viewModel(api, stores(backgroundScope))
-
-    model.rent(REQUEST)
-    model.submitLogin("rider@example.com", "wrong")
-
-    val flow = model.settled { (it.flow as? HireFlow.Login)?.error != null }.flow as HireFlow.Login
-    assertEquals("Those details were not accepted.", flow.error)
-    assertTrue(!flow.busy)
+  @Test fun `verification is completed before persisting a session`() = hireTest {
+    val store = AccountStore(PreferenceDataStoreFactory.create(scope = backgroundScope) { File(folder.root, "account.preferences_pb") })
+    val api = FakeApi().apply { login = PolarisLoginResult.VerificationRequired(LoginChallenge("challenge", Instant.parse("2099-01-01T00:00:00Z"), "Check email")) }
+    val model = model(api, store)
+    model.scan()
+    model.submitLogin(ACCOUNT.email, ACCOUNT.password.value)
+    model.state.first { it.flow is HireFlow.Verify }
+    assertNull(store.account.first())
+    model.submitVerification("123456")
+    model.state.first { it.account != null && it.flow == HireFlow.Scanning && it.ride is RideState.Known }
+    assertEquals(SESSION, store.account.first()?.session)
+    assertFalse(api.calls.any { it.startsWith("unlock") })
   }
 
-  @Test
-  fun `an unknown device verifies once, then the same request goes through`() = runTest {
-    val api =
-      FakeApi()
-        .willLogin(LoginResult.Success(CREDENTIALS))
-        .willHire(HireResult.VerificationNeeded(CHALLENGE), released())
-        .willVerify(VerifyResult.Verified)
-    val model = viewModel(api, stores(backgroundScope))
-
-    model.rent(REQUEST)
-    model.submitLogin("rider@example.com", "hunter2")
-    model.settled { it.account != null }
-    model.rent(REQUEST)
-    val challenged = model.settled { it.flow is HireFlow.Verify }
-    assertEquals(CHALLENGE, (challenged.flow as HireFlow.Verify).challenge)
-
-    model.submitVerification("42")
-    val released = model.settled { it.active != null }
-
-    assertEquals(
-      listOf("login(rider@example.com)", "hire(001023)", "verify(42)", "hire(001023)"),
-      api.calls,
-    )
-    assertEquals(ReleaseCode("13212"), released.active?.code)
-  }
-
-  @Test
-  fun `a wrong sms code keeps the dialog open with what the server said`() = runTest {
-    val api =
-      FakeApi()
-        .willLogin(LoginResult.Success(CREDENTIALS))
-        .willHire(HireResult.VerificationNeeded(CHALLENGE))
-        .willVerify(VerifyResult.Rejected("That code was not accepted."))
-    val model = viewModel(api, stores(backgroundScope))
-
-    model.rent(REQUEST)
-    model.submitLogin("rider@example.com", "hunter2")
-    model.settled { it.account != null }
-    model.rent(REQUEST)
-    model.settled { it.flow is HireFlow.Verify }
-    model.submitVerification("11")
-
-    val state = model.settled { (it.flow as? HireFlow.Verify)?.error != null }
-    assertEquals("That code was not accepted.", (state.flow as HireFlow.Verify).error)
-    assertNull(state.active)
-  }
-
-  @Test
-  fun `an account without access is sent to buy some instead of being refused`() = runTest {
-    val api =
-      FakeApi()
-        .willLogin(LoginResult.Success(CREDENTIALS))
-        .willHire(HireResult.AccessNeeded(listOf(SINGLE)))
-    val model = viewModel(api, stores(backgroundScope))
-
-    model.rent(REQUEST)
-    model.submitLogin("rider@example.com", "hunter2")
-    model.settled { it.account != null }
-    model.rent(REQUEST)
-
-    val state = model.settled { it.flow is HireFlow.NeedsAccess }
-    assertEquals(HireFlow.NeedsAccess(REQUEST), state.flow)
-    assertNull(state.failure(STATION))
-  }
-
-  @Test
-  fun `buying on the website ends back at the dock, waiting for the rider to rent`() = runTest {
-    val api =
-      FakeApi()
-        .willLogin(LoginResult.Success(CREDENTIALS))
-        .willHire(HireResult.AccessNeeded(listOf(SINGLE)))
-    val model = viewModel(api, stores(backgroundScope))
-
-    model.rent(REQUEST)
-    model.submitLogin("rider@example.com", "hunter2")
-    model.settled { it.account != null }
-    model.rent(REQUEST)
-    model.settled { it.flow is HireFlow.NeedsAccess }
-    model.buyOnWebsite(WebsitePass.Single)
-    assertEquals(HireFlow.BuyingOnWebsite(REQUEST, WebsitePass.Single), model.state.value.flow)
-    model.purchaseCompleted()
-
-    assertEquals(HireFlow.Bought(REQUEST), model.state.value.flow)
-    assertTrue(model.state.value.bought(STATION))
-    assertEquals(listOf("login(rider@example.com)", "hire(001023)"), api.calls)
-  }
-
-  @Test
-  fun `a refusal is shown against the dock that refused and nowhere else`() = runTest {
-    val api =
-      FakeApi()
-        .willLogin(LoginResult.Success(CREDENTIALS))
-        .willHire(HireResult.Refused("Sorry, but there are no bikes available at this location."))
-    val model = viewModel(api, stores(backgroundScope))
-
-    model.rent(REQUEST)
-    model.submitLogin("rider@example.com", "hunter2")
-    model.settled { it.account != null }
-    model.rent(REQUEST)
-
-    val state = model.settled { it.flow is HireFlow.Failed }
-    assertEquals("Sorry, but there are no bikes available at this location.", state.failure(STATION))
-    assertNull(state.failure(FeatureKey(LayerId("santander-cycles"), FeatureId("BikePoints_2"))))
-  }
-
-  @Test
-  fun `a code left over from an earlier run is dropped once the dock would refuse it`() = runTest {
-    val stale =
-      ActiveHire(
-        station = STATION,
-        stationName = "River Street, Clerkenwell",
-        code = ReleaseCode("13212"),
-        expiresAt = NOW.minusSeconds(60),
-      )
-    val stores = stores(backgroundScope)
-    stores.second.save(stale)
-
-    val model = viewModel(FakeApi(), stores)
-
-    assertNull(model.settled { true }.active)
-    assertNull(stores.second.hire.first { it == null })
-  }
-
-  @Test
-  fun `releasing a bike says a ride has started, once`() = runTest {
-    val workouts = FakeWorkouts()
-    val api = FakeApi().willLogin(LoginResult.Success(CREDENTIALS)).willHire(released())
-    val model = viewModel(api, stores(backgroundScope), workouts)
-
-    model.rent(REQUEST)
-    model.submitLogin("rider@example.com", "hunter2")
-    model.settled { it.account != null }
-    model.rent(REQUEST)
-    model.settled { it.active != null }
-
-    assertEquals(1, workouts.starts)
-  }
-
-  @Test
-  fun `a dock that refuses starts no ride`() = runTest {
-    val workouts = FakeWorkouts()
-    val api =
-      FakeApi()
-        .willLogin(LoginResult.Success(CREDENTIALS))
-        .willHire(HireResult.Refused("Sorry, but there are no bikes available at this location."))
-    val model = viewModel(api, stores(backgroundScope), workouts)
-
-    model.rent(REQUEST)
-    model.submitLogin("rider@example.com", "hunter2")
-    model.settled { it.account != null }
-    model.rent(REQUEST)
-    model.settled { it.flow is HireFlow.Failed }
-
-    assertEquals(0, workouts.starts)
-  }
-
-  @Test
-  fun `a code still held from an earlier run does not start the ride again`() = runTest {
-    val workouts = FakeWorkouts()
-    val stores = stores(backgroundScope)
-    stores.second.save(
-      ActiveHire(
-        station = STATION,
-        stationName = "River Street, Clerkenwell",
-        code = ReleaseCode("13212"),
-        expiresAt = NOW.plusSeconds(600),
-      )
-    )
-
-    val model = viewModel(FakeApi(), stores, workouts)
-    model.settled { it.active != null }
-
-    assertEquals(0, workouts.starts)
-  }
-
-  @Test
-  fun `a token the backend has dropped is replaced from the saved password, in one tap`() =
-    runTest {
-      val api =
-        FakeApi()
-          .willLogin(LoginResult.Success(CREDENTIALS), LoginResult.Success(FRESH_CREDENTIALS))
-          .willHire(HireResult.LoggedOut, released())
-      val stores = stores(backgroundScope)
-      val model = viewModel(api, stores)
-
-      model.rent(REQUEST)
-      model.submitLogin("rider@example.com", "hunter2")
-      model.settled { it.account != null }
-      model.rent(REQUEST)
-
-      val state = model.settled { it.active != null }
-      assertEquals(
-        listOf(
-          "login(rider@example.com)",
-          "hire(001023)",
-          "login(rider@example.com)",
-          "hire(001023)",
-        ),
-        api.calls,
-      )
-      assertEquals(HireFlow.Idle, state.flow)
-      assertEquals(ReleaseCode("13212"), state.active?.code)
-      assertEquals(
-        Password("hunter2"),
-        stores.first.account.first { it?.credentials == FRESH_CREDENTIALS }?.password,
-      )
+  @Test fun `Corethree tokens are never loaded as Polaris sessions`() = hireTest {
+    val preferences = PreferenceDataStoreFactory.create(scope = backgroundScope) { File(folder.root, "account.preferences_pb") }
+    preferences.edit {
+      it[stringPreferencesKey("email")] = ACCOUNT.email
+      it[stringPreferencesKey("password")] = ACCOUNT.password.value
+      it[stringPreferencesKey("user_node_id")] = "old-node"
+      it[stringPreferencesKey("auth_token")] = "old-token"
     }
+    assertNull(AccountStore(preferences).account.first())
+  }
 
-  @Test
-  fun `a password the backend no longer accepts puts the login form back, with the email in it`() =
-    runTest {
-      val api =
-        FakeApi()
-          .willLogin(
-            LoginResult.Success(CREDENTIALS),
-            LoginResult.Rejected("Those details were not accepted."),
-          )
-          .willHire(HireResult.LoggedOut)
-      val model = viewModel(api, stores(backgroundScope))
+  @Test fun `an uncertain unlock is never silently retried`() = hireTest {
+    val store = AccountStore(PreferenceDataStoreFactory.create(scope = backgroundScope) { File(folder.root, "account.preferences_pb") })
+    store.save(ACCOUNT)
+    val api = FakeApi().apply { unlock = UnlockResult.Unavailable("Check the bike before retrying") }
+    val model = model(api, store)
+    model.state.first { it.account != null && it.ride is RideState.Known }
+    model.scan()
+    model.unlock(BIKE)
+    model.state.first { it.flow == HireFlow.UnlockFailed(BIKE, "Check the bike before retrying") }
+    assertEquals(1, api.calls.count { it.startsWith("unlock") })
+    assertNull(model.state.value.active)
+  }
 
-      model.rent(REQUEST)
-      model.submitLogin("rider@example.com", "hunter2")
-      model.settled { it.account != null }
-      model.rent(REQUEST)
+  @Test fun `a lost session asks for login before any new unlock`() = hireTest {
+    val store = AccountStore(PreferenceDataStoreFactory.create(scope = backgroundScope) { File(folder.root, "account.preferences_pb") })
+    store.save(ACCOUNT)
+    val api = FakeApi().apply { ride = RideResult.LoggedOut }
+    val model = model(api, store)
+    model.state.first { it.ride is RideState.LoggedOut }
+    model.scan()
+    assertTrue(model.state.value.flow is HireFlow.Login)
+    assertFalse(api.calls.any { it.startsWith("unlock") })
+  }
 
-      val flow = model.settled { it.flow is HireFlow.Login }.flow as HireFlow.Login
-      assertEquals("rider@example.com", flow.email)
-      assertEquals("Those details were not accepted.", flow.error)
-      assertEquals(REQUEST, flow.request)
-    }
+  @Test fun `failed status reads preserve the last ride and prevent another hire`() = hireTest {
+    val store = AccountStore(PreferenceDataStoreFactory.create(scope = backgroundScope) { File(folder.root, "account.preferences_pb") })
+    store.save(ACCOUNT)
+    val ride = CurrentRide(RideId("ride"), RideStatus("active"), Instant.parse("2026-11-17T18:00:00Z"), 1)
+    val api = FakeApi().apply { this.ride = RideResult.Success(ride) }
+    val model = model(api, store)
+    model.state.first { it.active != null }
+    api.ride = RideResult.Unavailable("offline")
+    model.refreshRide()
+    model.state.first { it.ride is RideState.Unavailable }
+    assertEquals(ride, model.state.value.active)
+    model.scan()
+    assertTrue(model.state.value.flow is HireFlow.UnlockFailed)
+    assertFalse(api.calls.any { it.startsWith("unlock") })
+  }
 
-  @Test
-  fun `being logged out again straight after logging in stops asking and hands over the form`() =
-    runTest {
-      val workouts = FakeWorkouts()
-      val api =
-        FakeApi()
-          .willLogin(LoginResult.Success(CREDENTIALS), LoginResult.Success(FRESH_CREDENTIALS))
-          .willHire(HireResult.LoggedOut, HireResult.LoggedOut)
-      val model = viewModel(api, stores(backgroundScope), workouts)
+  @Test fun `workout starts once when an accepted unlock becomes an active ride`() = hireTest {
+    val store = AccountStore(PreferenceDataStoreFactory.create(scope = backgroundScope) { File(folder.root, "account.preferences_pb") })
+    store.save(ACCOUNT)
+    val gate = CompletableDeferred<Unit>()
+    val api = FakeApi().apply { unlockGate = gate }
+    var starts = 0
+    val model = model(api, store, WorkoutSignal { starts++ })
+    model.state.first { it.account != null && it.ride is RideState.Known }
+    model.scan()
+    model.unlock(BIKE)
+    assertEquals(0, starts)
+    api.ride = RideResult.Success(CurrentRide(RideId("ride"), RideStatus("active"), Instant.parse("2026-11-17T18:00:00Z"), 1))
+    gate.complete(Unit)
+    model.state.first { it.active != null }
+    model.refreshRide()
+    assertEquals(1, starts)
+  }
 
-      model.rent(REQUEST)
-      model.submitLogin("rider@example.com", "hunter2")
-      model.settled { it.account != null }
-      model.rent(REQUEST)
 
-      val flow = model.settled { it.flow is HireFlow.Login }.flow as HireFlow.Login
-      assertEquals("rider@example.com", flow.email)
-      assertTrue(flow.error!!.contains("logged this device out"))
-      assertEquals(2, api.calls.count { it == "hire(001023)" })
-      assertEquals(0, workouts.starts)
-    }
+  @Test fun `debug QR unlock needs no scan and enters the usual access flow`() = hireTest {
+    val store = AccountStore(PreferenceDataStoreFactory.create(scope = backgroundScope) { File(folder.root, "account.preferences_pb") })
+    store.save(ACCOUNT)
+    val api = FakeApi().apply { unlock = UnlockResult.AccessNeeded("Your membership has expired", "Please renew your membership") }
+    val model = model(api, store)
+    model.state.first { it.account != null && it.ride is RideState.Known }
+    model.unlock(BIKE)
+    model.state.first { it.flow is HireFlow.NeedsAccess }
+    assertEquals(listOf(BIKE), api.identifiers)
+  }
 
-  @Test
-  fun `losing the session while verifying asks for the login rather than the digits`() = runTest {
-    val api =
-      FakeApi()
-        .willLogin(LoginResult.Success(CREDENTIALS))
-        .willHire(HireResult.VerificationNeeded(CHALLENGE))
-        .willVerify(VerifyResult.LoggedOut)
-    val model = viewModel(api, stores(backgroundScope))
+  @Test fun `debug QR unlock cannot be submitted twice or dismissed while pending`() = hireTest {
+    val store = AccountStore(PreferenceDataStoreFactory.create(scope = backgroundScope) { File(folder.root, "account.preferences_pb") })
+    store.save(ACCOUNT)
+    val gate = CompletableDeferred<Unit>()
+    val api = FakeApi().apply { unlockGate = gate; unlock = UnlockResult.Refused("Bike unavailable") }
+    val model = model(api, store)
+    model.state.first { it.account != null && it.ride is RideState.Known }
+    model.unlock(BIKE)
+    model.unlock(BIKE)
+    model.dismiss()
+    assertEquals(HireFlow.Unlocking(BIKE), model.state.value.flow)
+    assertEquals(listOf(BIKE), api.identifiers)
+    gate.complete(Unit)
+    model.state.first { it.flow == HireFlow.UnlockFailed(BIKE, "Bike unavailable") }
+  }
 
-    model.rent(REQUEST)
-    model.submitLogin("rider@example.com", "hunter2")
-    model.settled { it.account != null }
-    model.rent(REQUEST)
-    model.settled { it.flow is HireFlow.Verify }
-    model.submitVerification("42")
+  private fun tutorialChallenge(): UnlockResult.TutorialRequired {
+    val bike = checkNotNull(QrCode.parse("ABDRDO"))
+    val attempt = UnlockAttempt(bike, MutationSessionId("session"), listOf(TutorialRetryReason("INTERSTITIAL_POLARIS_PRE_RIDE_TUTORIAL", "frt-completed")))
+    return UnlockResult.TutorialRequired(RideTutorial(listOf(TutorialPage("Dock safely", "Check for a green light"))), UnlockContinuation(SESSION.member, attempt))
+  }
 
-    val flow = model.settled { it.flow is HireFlow.Login }.flow as HireFlow.Login
-    assertEquals("rider@example.com", flow.email)
-    assertEquals(REQUEST, flow.request)
+  @Test fun `tutorial waits for confirmation and prevents duplicate continuation or dismissal while pending`() = hireTest {
+    val store = AccountStore(PreferenceDataStoreFactory.create(scope = backgroundScope) { File(folder.root, "account.preferences_pb") })
+    store.save(ACCOUNT)
+    val api = FakeApi().apply { unlock = tutorialChallenge() }
+    var starts = 0
+    val model = model(api, store, WorkoutSignal { starts++ })
+    model.state.first { it.account != null && it.ride is RideState.Known }
+    model.unlock(BIKE)
+    model.state.first { it.flow is HireFlow.Tutorial }
+    runCurrent()
+    assertFalse(api.calls.contains("continue"))
+    assertEquals(0, starts)
+    api.unlock = UnlockResult.Accepted
+    val gate = CompletableDeferred<Unit>()
+    api.unlockGate = gate
+    model.continueTutorial()
+    model.continueTutorial()
+    model.dismiss()
+    assertTrue((model.state.value.flow as HireFlow.Tutorial).busy)
+    assertEquals(1, api.calls.count { it == "continue" })
+    gate.complete(Unit)
+    model.state.first { it.flow == HireFlow.UnlockAccepted }
+    assertEquals(0, starts)
+  }
+
+  @Test fun `dismissing the tutorial never acknowledges or resumes the unlock`() = hireTest {
+    val store = AccountStore(PreferenceDataStoreFactory.create(scope = backgroundScope) { File(folder.root, "account.preferences_pb") })
+    store.save(ACCOUNT)
+    val api = FakeApi().apply { unlock = tutorialChallenge() }
+    val model = model(api, store)
+    model.state.first { it.account != null && it.ride is RideState.Known }
+    model.scan()
+    model.unlock(BIKE)
+    model.state.first { it.flow is HireFlow.Tutorial }
+    runCurrent()
+    model.dismiss()
+    model.continueTutorial()
+    assertEquals(HireFlow.Idle, model.state.value.flow)
+    assertFalse(api.calls.contains("continue"))
+  }
+
+  @Test fun `a continuation refusal is shown against the scanned bike`() = hireTest {
+    val store = AccountStore(PreferenceDataStoreFactory.create(scope = backgroundScope) { File(folder.root, "account.preferences_pb") })
+    store.save(ACCOUNT)
+    val api = FakeApi().apply { unlock = tutorialChallenge() }
+    val model = model(api, store)
+    model.state.first { it.account != null && it.ride is RideState.Known }
+    model.unlock(BIKE)
+    model.state.first { it.flow is HireFlow.Tutorial }
+    runCurrent()
+    api.unlock = UnlockResult.Refused("Bike unavailable")
+    model.continueTutorial()
+    model.state.first { it.flow == HireFlow.UnlockFailed(BIKE, "Bike unavailable") }
+    assertEquals(1, api.calls.count { it == "continue" })
+  }
+
+  @Test fun `scanning does not unlock until a code is read`() = hireTest {
+    val store = AccountStore(PreferenceDataStoreFactory.create(scope = backgroundScope) { File(folder.root, "account.preferences_pb") })
+    store.save(ACCOUNT)
+    val api = FakeApi()
+    val model = model(api, store)
+    model.state.first { it.account != null && it.ride is RideState.Known }
+    model.scan()
+    assertEquals(HireFlow.Scanning, model.state.value.flow)
+    assertFalse(api.calls.any { it.startsWith("unlock") })
+    model.unlock(BIKE)
+    model.state.first { it.flow == HireFlow.UnlockAccepted }
+    assertEquals(listOf(BIKE), api.identifiers)
+  }
+
+  @Test fun `scanning resumes the camera after login without submitting an unlock`() = hireTest {
+    val store = AccountStore(PreferenceDataStoreFactory.create(scope = backgroundScope) { File(folder.root, "account.preferences_pb") })
+    val api = FakeApi()
+    val model = model(api, store)
+    model.scan()
+    assertTrue(model.state.value.flow is HireFlow.Login)
+    model.submitLogin("rider@example.test", "password")
+    model.state.first { it.account != null && it.flow == HireFlow.Scanning }
+    assertFalse(api.calls.any { it.startsWith("unlock") })
+  }
+
+  @Test fun `account login never opens the scanner or submits an unlock`() = hireTest {
+    val store = AccountStore(PreferenceDataStoreFactory.create(scope = backgroundScope) { File(folder.root, "account.preferences_pb") })
+    val api = FakeApi()
+    val model = model(api, store)
+    model.signIn()
+    assertEquals(LoginPurpose.Account, (model.state.value.flow as HireFlow.Login).purpose)
+    model.submitLogin("rider@example.test", "password")
+    model.state.first { it.flow == HireFlow.AccountReady }
+    assertFalse(api.calls.any { it.startsWith("unlock") })
+  }
+
+  @Test fun `resending a code logs in again and replaces the challenge`() = hireTest {
+    val store = AccountStore(PreferenceDataStoreFactory.create(scope = backgroundScope) { File(folder.root, "account.preferences_pb") })
+    val first = LoginChallenge("first", Instant.parse("2099-01-01T00:00:00Z"), "Check email")
+    val api = FakeApi().apply { login = PolarisLoginResult.VerificationRequired(first) }
+    val model = model(api, store)
+    model.scan()
+    model.submitLogin(ACCOUNT.email, ACCOUNT.password.value)
+    model.state.first { it.flow is HireFlow.Verify }
+    val second = LoginChallenge("second", Instant.parse("2099-01-01T00:00:00Z"), "Check email")
+    api.login = PolarisLoginResult.VerificationRequired(second)
+    model.resendCode()
+    model.state.first { (it.flow as? HireFlow.Verify)?.challenge == second }
+    assertEquals(2, api.calls.count { it == "login" })
+    assertNull(store.account.first())
   }
 }

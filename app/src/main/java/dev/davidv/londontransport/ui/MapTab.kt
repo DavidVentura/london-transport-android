@@ -8,6 +8,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,7 +18,9 @@ import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.outlined.LocationSearching
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Surface
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -99,8 +102,8 @@ fun MapTab(
         }
       }
     }
-
-    FloatingActionButton(
+    // Styled as part of the map, like the map apps' own controls, rather than as an app action.
+    Surface(
       onClick = {
         if (permitted) {
           followLocation = !followLocation
@@ -108,12 +111,18 @@ fun MapTab(
           requestPermission.launch(Manifest.permission.ACCESS_FINE_LOCATION)
         }
       },
-      modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
+      shape = CircleShape,
+      color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+      contentColor = if (followLocation) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+      shadowElevation = 3.dp,
+      modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp).size(48.dp),
     ) {
-      Icon(
-        if (followLocation) Icons.Filled.MyLocation else Icons.Outlined.LocationSearching,
-        contentDescription = "Follow my location",
-      )
+      Box(contentAlignment = Alignment.Center) {
+        Icon(
+          if (followLocation) Icons.Filled.MyLocation else Icons.Outlined.LocationSearching,
+          contentDescription = "Follow my location",
+        )
+      }
     }
   }
 }

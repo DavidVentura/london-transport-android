@@ -180,7 +180,7 @@ fun FeatureMap(
         if (darkTiles) TilesOverlay.INVERT_COLORS else null
       )
       routeOverlay.show(routes)
-      overlay.show(features, selected, favourites)
+      overlay.show(features, selected, favourites, if (darkTiles) TileShade.Dark else TileShade.Light)
       view.invalidate()
     },
   )

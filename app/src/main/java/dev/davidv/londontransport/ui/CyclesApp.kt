@@ -1,7 +1,6 @@
 package dev.davidv.londontransport.ui
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -9,18 +8,22 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.outlined.DirectionsBike
 import androidx.compose.material.icons.outlined.DirectionsBus
-import androidx.compose.material.icons.outlined.DirectionsSubway
+import androidx.compose.material.icons.outlined.QrCodeScanner
 import androidx.compose.material.icons.outlined.Map
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.BottomAppBar
+import androidx.compose.material3.BottomAppBarDefaults
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.FloatingActionButtonDefaults
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -32,18 +35,17 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import dev.davidv.londontransport.santander.WebsitePass
+import dev.davidv.londontransport.data.PaymentVault
 import dev.davidv.londontransport.domain.MapFeature
 import dev.davidv.londontransport.layers.BUS_STOP_LAYER
 import dev.davidv.londontransport.layers.PIN_LAYER
-import dev.davidv.londontransport.domain.BikeDisplay
 import dev.davidv.londontransport.domain.TransportKind
 import dev.davidv.londontransport.map.DrawnRoute
 import java.time.Duration
@@ -73,30 +75,55 @@ fun CyclesApp(
   viewModel: CyclesViewModel,
   routesViewModel: RoutesViewModel,
   hireViewModel: HireViewModel,
+  purchaseViewModel: PurchaseViewModel,
+  paymentVault: PaymentVault,
+  accountViewModel: AccountViewModel,
 ) {
   val state by viewModel.state.collectAsStateWithLifecycle()
   val routes by routesViewModel.state.collectAsStateWithLifecycle()
   val hire by hireViewModel.state.collectAsStateWithLifecycle()
   var tab by rememberSaveable { mutableStateOf(Tab.MAP) }
   var picking by rememberSaveable { mutableStateOf(false) }
+  val account by accountViewModel.state.collectAsStateWithLifecycle()
 
-  var debugPurchase by remember { mutableStateOf<WebsitePass?>(null) }
-  debugPurchase?.let { pass ->
-    val close = { debugPurchase = null }
-    PurchaseWebView(pass = pass, account = hire.account, onClose = close, onCompleted = close)
+  val snackbar = remember { SnackbarHostState() }
+  LaunchedEffect(hire.flow) {
+    when (hire.flow) {
+      HireFlow.AccountReady -> {
+        hireViewModel.dismiss()
+        accountViewModel.openProfile()
+      }
+      HireFlow.UnlockAccepted -> {
+        hireViewModel.dismiss()
+        snackbar.showSnackbar("Unlock requested. Pull the bike from the dock once it releases.")
+      }
+      else -> Unit
+    }
+  }
+
+  if (account.flow != AccountFlow.Closed) {
+    AccountScreen(account, accountViewModel) {
+      accountViewModel.close()
+      purchaseViewModel.open()
+    }
     return
   }
 
-  // The banner carries the code from here on, and a sheet still offering Rent bike invites a second
-  // bike by mistake.
-  LaunchedEffect(hire.active?.code) { if (hire.active != null) viewModel.select(null) }
-
-  (hire.flow as? HireFlow.BuyingOnWebsite)?.let { buying ->
-    PurchaseWebView(
-      pass = buying.pass,
-      account = hire.account,
-      onClose = hireViewModel::dismiss,
-      onCompleted = hireViewModel::purchaseCompleted,
+  val purchase by purchaseViewModel.state.collectAsStateWithLifecycle()
+  if (purchase.flow != PurchaseFlow.Closed) {
+    ApiPurchaseScreen(
+      state = purchase,
+      model = purchaseViewModel,
+      vault = paymentVault,
+      onDone = purchaseViewModel::close,
+      onScan = {
+        purchaseViewModel.close()
+        hireViewModel.scan()
+      },
+      onOpenAccount = {
+        purchaseViewModel.close()
+        accountViewModel.openProfile()
+      },
     )
     return
   }
@@ -113,6 +140,7 @@ fun CyclesApp(
 
   LifecycleResumeEffect(Unit) {
     viewModel.refreshIfOlderThan(STALE_AFTER)
+    hireViewModel.refreshRide()
     onPauseOrDispose {}
   }
 
@@ -122,25 +150,26 @@ fun CyclesApp(
         TopAppBar(
           title = {
             Column {
-              Text("London Transport")
+              Text("London Transport", maxLines = 1, overflow = TextOverflow.Ellipsis)
               subtitle(state)?.let { line ->
                 Text(line, style = MaterialTheme.typography.labelSmall)
               }
             }
           },
           actions = {
-            BikeDisplayButton(display = state.bikeDisplay, onClick = viewModel::cycleBikeDisplay)
-            listOf(TransportKind.BUS, TransportKind.TUBE).forEach { kind ->
-              IconButton(onClick = { viewModel.toggleKind(kind) }) {
-                Icon(
-                  kindIcon(kind),
-                  contentDescription = "Show ${kindLabel(kind)}",
-                  tint =
-                    if (state.shows(kind)) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.outlineVariant,
-                )
-              }
-            }
+            ViewPreferencesMenu(
+              bikeDisplay = state.bikeDisplay,
+              shownKinds = shownKinds,
+              onBikeDisplay = viewModel::setBikeDisplay,
+              onToggleKind = viewModel::toggleKind,
+            )
+            AccountMenu(
+              signedIn = !hire.needsLogin,
+              onProfile = { viewModel.select(null); accountViewModel.openProfile() },
+              onHistory = { viewModel.select(null); accountViewModel.openHistory() },
+              onSignOut = { hireViewModel.dismiss(); accountViewModel.signOut() },
+              onSignIn = { viewModel.select(null); hireViewModel.signIn() },
+            )
             if (state.refreshing) {
               CircularProgressIndicator(modifier = Modifier.padding(16.dp).size(24.dp))
             } else {
@@ -148,37 +177,61 @@ fun CyclesApp(
                 onClick = {
                   viewModel.refresh()
                   routesViewModel.refreshNow()
+                  hireViewModel.refreshRide()
                 }
               ) {
                 Icon(Icons.Filled.Refresh, contentDescription = "Refresh")
               }
             }
-            DebugMenu(onOpenPurchase = { pass -> debugPurchase = pass })
+            DebugMenu(
+              onOpenPurchase = purchaseViewModel::open,
+              qrUnlockEnabled = !hire.needsLogin && hire.ride is RideState.Known && hire.active == null,
+              onUnlockQr = hireViewModel::unlock,
+            )
           },
         )
-        hire.active?.let { active ->
-          ReleaseCodeBar(
-            hire = active,
-            onOpen = {
-              features.firstOrNull { it.key == active.station }?.let(viewModel::focusOn)
-              tab = Tab.MAP
-            },
-            onDismiss = hireViewModel::dismissCode,
-          )
+        hire.active?.let { active -> ActiveRideBar(ride = active, onRefresh = hireViewModel::refreshRide) }
+        hire.rideError?.let { message ->
+          val action =
+            if (hire.ride is RideState.LoggedOut) UiAction("Log in", onClick = hireViewModel::signIn)
+            else UiAction("Retry", onClick = hireViewModel::refreshRide)
+          ErrorBanner(message, action)
         }
       }
     },
+    snackbarHost = { SnackbarHost(snackbar) },
     bottomBar = {
-      NavigationBar {
-        Tab.entries.forEach { entry ->
-          NavigationBarItem(
-            selected = tab == entry,
-            onClick = { tab = entry },
-            icon = { Icon(entry.icon, contentDescription = null) },
-            label = { Text(entry.label) },
-          )
-        }
-      }
+      BottomAppBar(
+        actions = {
+          Tab.entries.forEach { entry ->
+            if (tab == entry) {
+              FilledTonalIconButton(onClick = {}, modifier = Modifier.padding(horizontal = 4.dp)) {
+                Icon(entry.icon, contentDescription = entry.label)
+              }
+            } else {
+              IconButton(onClick = { tab = entry }, modifier = Modifier.padding(horizontal = 4.dp)) {
+                Icon(entry.icon, contentDescription = entry.label)
+              }
+            }
+          }
+        },
+        floatingActionButton =
+          if (hire.active != null) null
+          else {
+            {
+              ExtendedFloatingActionButton(
+                onClick = {
+                  viewModel.select(null)
+                  hireViewModel.scan()
+                },
+                icon = { Icon(Icons.Outlined.QrCodeScanner, contentDescription = null) },
+                text = { Text("Scan") },
+                containerColor = BottomAppBarDefaults.bottomAppBarFabColor,
+                elevation = FloatingActionButtonDefaults.bottomAppBarFabElevation(),
+              )
+            }
+          },
+      )
     },
   ) { padding ->
     when (tab) {
@@ -255,86 +308,13 @@ fun CyclesApp(
           feature = selected,
           favourite = selected.key in state.favourites,
           onToggleFavourite = { viewModel.toggleFavourite(selected.key) },
-          hire = hire,
-          onRent = { target ->
-            hireViewModel.rent(HireRequest(selected.key, selected.title, target))
-          },
         )
       }
     }
   }
 
-  when (val flow = hire.flow) {
-    is HireFlow.Login ->
-      ModalBottomSheet(
-        onDismissRequest = hireViewModel::dismiss,
-        sheetState = rememberModalBottomSheetState(),
-      ) {
-        LoginSheet(
-          stationName = flow.request.stationName,
-          knownEmail = flow.email,
-          busy = flow.busy,
-          error = flow.error,
-          onSubmit = hireViewModel::submitLogin,
-        )
-      }
-    is HireFlow.NeedsAccess ->
-      ModalBottomSheet(
-        onDismissRequest = hireViewModel::dismiss,
-        sheetState = rememberModalBottomSheetState(),
-      ) {
-        AccessSheet(onBuyOnWebsite = hireViewModel::buyOnWebsite)
-      }
-    is HireFlow.Verify ->
-      VerifyDialog(
-        challenge = flow.challenge,
-        busy = flow.busy,
-        error = flow.error,
-        onSubmit = hireViewModel::submitVerification,
-        onDismiss = hireViewModel::dismiss,
-      )
-    else -> Unit
-  }
-}
-
-private fun kindIcon(kind: TransportKind): ImageVector =
-  when (kind) {
-    TransportKind.BIKE -> Icons.Outlined.DirectionsBike
-    TransportKind.BUS -> Icons.Outlined.DirectionsBus
-    TransportKind.TUBE -> Icons.Outlined.DirectionsSubway
-  }
-
-private fun kindLabel(kind: TransportKind): String =
-  when (kind) {
-    TransportKind.BIKE -> "cycle hire"
-    TransportKind.BUS -> "buses"
-    TransportKind.TUBE -> "tube"
-  }
-
-@Composable
-private fun BikeDisplayButton(display: BikeDisplay, onClick: () -> Unit) {
-  IconButton(onClick = onClick) {
-    Box(contentAlignment = Alignment.Center) {
-      Icon(
-        Icons.Outlined.DirectionsBike,
-        contentDescription =
-          when (display) {
-            BikeDisplay.NONE -> "Docking stations hidden"
-            BikeDisplay.FAVOURITES -> "Favourite docking stations only"
-            BikeDisplay.ALL -> "All docking stations"
-          },
-        tint =
-          if (display == BikeDisplay.NONE) MaterialTheme.colorScheme.outlineVariant
-          else MaterialTheme.colorScheme.primary,
-      )
-      if (display == BikeDisplay.FAVOURITES) {
-        Icon(
-          Icons.Filled.Star,
-          contentDescription = null,
-          tint = MaterialTheme.colorScheme.primary,
-          modifier = Modifier.size(11.dp).align(Alignment.TopEnd),
-        )
-      }
-    }
+  HireFlowHost(hire.flow, hireViewModel) {
+    hireViewModel.dismiss()
+    purchaseViewModel.open()
   }
 }

@@ -1,7 +1,11 @@
 package dev.davidv.londontransport
 
 import android.os.Bundle
-import androidx.activity.ComponentActivity
+import android.content.Intent
+import androidx.lifecycle.ViewModelProvider
+import dev.davidv.londontransport.ui.PurchaseViewModel
+import dev.davidv.londontransport.ui.AccountViewModel
+import androidx.fragment.app.FragmentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -13,7 +17,8 @@ import dev.davidv.londontransport.ui.HireViewModel
 import dev.davidv.londontransport.ui.RoutesViewModel
 import dev.davidv.londontransport.ui.LondonTransportTheme
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
+  private lateinit var purchases: PurchaseViewModel
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     enableEdgeToEdge()
@@ -29,9 +34,18 @@ class MainActivity : ComponentActivity() {
     }
     val hire = viewModelFactory {
       initializer {
-        HireViewModel(graph.santander, graph.account, graph.activeHire, graph.workouts)
+        HireViewModel(graph.santander, graph.account, graph.workouts)
       }
     }
+
+    val purchaseFactory = viewModelFactory {
+      initializer { PurchaseViewModel(graph.purchaseApi, graph.account, graph.paymentMethods, graph.paymentVault, graph.pendingPurchases) }
+    }
+    purchases = ViewModelProvider(this, purchaseFactory)[PurchaseViewModel::class.java]
+    val accountFactory = viewModelFactory {
+      initializer { AccountViewModel(graph.accountApi, graph.purchaseApi, graph.account) }
+    }
+    receivePaymentReturn(intent)
 
     setContent {
       LondonTransportTheme {
@@ -39,8 +53,23 @@ class MainActivity : ComponentActivity() {
           viewModel(factory = cycles),
           viewModel(factory = routes),
           viewModel(factory = hire),
+          purchases,
+          graph.paymentVault,
+          viewModel(factory = accountFactory),
         )
       }
     }
   }
+
+  override fun onNewIntent(intent: Intent) {
+    super.onNewIntent(intent)
+    setIntent(intent)
+    receivePaymentReturn(intent)
+  }
+
+  private fun receivePaymentReturn(intent: Intent) {
+    val url = intent.data ?: return
+    if (url.scheme == "londontransport" && url.host == "hpp_purchase") purchases.returned(url.toString())
+  }
+
 }

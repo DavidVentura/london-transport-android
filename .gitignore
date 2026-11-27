@@ -11,3 +11,6 @@
 /unsigned
 /signed
 *.jks
+
+/.local-secrets/
+/.kotlin/

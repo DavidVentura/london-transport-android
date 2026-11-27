@@ -171,9 +171,8 @@ class CyclesViewModel(
     viewModelScope.launch { settings.setKindVisible(kind, wanted) }
   }
 
-  fun cycleBikeDisplay() {
-    val wanted = _state.value.bikeDisplay.next()
-    viewModelScope.launch { settings.setBikeDisplay(wanted) }
+  fun setBikeDisplay(display: BikeDisplay) {
+    viewModelScope.launch { settings.setBikeDisplay(display) }
   }
 
   fun focusOn(feature: MapFeature) {

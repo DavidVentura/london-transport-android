@@ -1,5 +1,6 @@
 package dev.davidv.londontransport.ui
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -20,7 +21,7 @@ import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
-import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -62,13 +63,17 @@ fun LinesTab(
       }
 
       if (state.routes.isEmpty()) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(
+          modifier = Modifier.fillMaxSize().padding(32.dp),
+          horizontalAlignment = Alignment.CenterHorizontally,
+          verticalArrangement = Arrangement.Center,
+        ) {
           Text(
             "Add a bus route or tube line to draw it on the map.",
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center,
-            modifier = Modifier.padding(32.dp),
           )
+          AddLineButton(onAdd, Modifier.padding(top = 16.dp))
         }
         return@Column
       }
@@ -111,15 +116,9 @@ fun LinesTab(
           }
           HorizontalDivider()
         }
+        item { AddLineButton(onAdd, Modifier.padding(16.dp)) }
       }
     }
-
-    ExtendedFloatingActionButton(
-      onClick = onAdd,
-      icon = { Icon(Icons.Filled.Add, contentDescription = null) },
-      text = { Text("Add line") },
-      modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
-    )
   }
 }
 
@@ -163,3 +162,11 @@ private fun opposite(direction: RouteDirection): RouteDirection =
     RouteDirection.INBOUND -> RouteDirection.OUTBOUND
     RouteDirection.OUTBOUND -> RouteDirection.INBOUND
   }
+
+@Composable
+private fun AddLineButton(onAdd: () -> Unit, modifier: Modifier) {
+  OutlinedButton(onClick = onAdd, modifier = modifier) {
+    Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
+    Text("Add line")
+  }
+}

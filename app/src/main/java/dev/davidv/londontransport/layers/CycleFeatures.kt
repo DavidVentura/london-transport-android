@@ -1,13 +1,11 @@
 package dev.davidv.londontransport.layers
 
 import dev.davidv.londontransport.domain.AvailabilityLevel
-import dev.davidv.londontransport.domain.DetailRow
 import dev.davidv.londontransport.domain.FeatureId
 import dev.davidv.londontransport.domain.FeatureKey
-import dev.davidv.londontransport.domain.HireTarget
 import dev.davidv.londontransport.domain.LayerId
 import dev.davidv.londontransport.domain.MapFeature
-import dev.davidv.londontransport.domain.PointName
+import dev.davidv.londontransport.domain.Stat
 import dev.davidv.londontransport.domain.Station
 import dev.davidv.londontransport.domain.StationState
 import dev.davidv.londontransport.domain.StationStatus
@@ -22,16 +20,9 @@ fun stationFeature(station: Station): MapFeature =
     level = level(station.status),
     badge = badge(station.status),
     summary = summary(station.status),
-    details = details(station.status),
-    hire = hireTarget(station),
+    details = emptyList(),
+    stats = stats(station.status),
   )
-
-/** A dock read back from the cache still gets a button: the counts are unknown, not the dock. */
-private fun hireTarget(station: Station): HireTarget? {
-  val status = station.status
-  if (status is StationStatus.Live && status.state != StationState.OPERATIONAL) return null
-  return HireTarget(terminal = station.terminal, point = PointName(station.name))
-}
 
 private fun level(status: StationStatus): AvailabilityLevel =
   when (status) {
@@ -75,25 +66,15 @@ private fun summary(status: StationStatus): String =
       }
   }
 
-private fun details(status: StationStatus): List<DetailRow> =
-  when (status) {
-    StationStatus.Unknown -> listOf(DetailRow("Status", "Not checked since you were last online"))
-    is StationStatus.Live ->
-      listOf(
-        DetailRow("Standard bikes", status.bikes.standard.toString()),
-        DetailRow("Electric bikes", status.bikes.electric.toString()),
-        DetailRow("Free docks", status.emptyDocks.toString()),
-        DetailRow("Total docks", status.capacity.toString()),
-        DetailRow(
-          "Status",
-          when (status.state) {
-            StationState.OPERATIONAL -> "In service"
-            StationState.LOCKED -> "Closed"
-            StationState.NOT_INSTALLED -> "Not installed"
-          },
-        ),
-      )
-  }
+/** Only a station in service has counts worth showing; the summary already says why otherwise. */
+private fun stats(status: StationStatus): List<Stat> {
+  if (status !is StationStatus.Live || status.state != StationState.OPERATIONAL) return emptyList()
+  return listOf(
+    Stat("Bikes", status.bikes.standard),
+    Stat("E-bikes", status.bikes.electric),
+    Stat("Free docks", status.emptyDocks),
+  )
+}
 
 private fun plural(count: Int, noun: String): String =
   if (count == 1) "1 $noun" else "$count ${noun}s"

@@ -1,33 +1,16 @@
 package dev.davidv.londontransport.ui
 
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import dev.davidv.londontransport.santander.WebsitePass
 
+/** Santander Cycles' own alert, with its title and message kept as sent. */
 @Composable
-fun AccessSheet(onBuyOnWebsite: (WebsitePass) -> Unit) {
-  Column(modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, bottom = 32.dp)) {
-    Text("No active subscription", style = MaterialTheme.typography.headlineSmall)
-    Text(
-      "Buy one on Santander Cycles, then tap Rent bike again.",
-      style = MaterialTheme.typography.bodyMedium,
-      color = MaterialTheme.colorScheme.onSurfaceVariant,
-      modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
-    )
-    WebsitePass.entries.forEach { pass ->
-      OutlinedButton(
-        onClick = { onBuyOnWebsite(pass) },
-        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-      ) {
-        Text(pass.label)
-      }
-    }
+fun AccessSheet(flow: HireFlow.NeedsAccess, onBuy: () -> Unit, onClose: () -> Unit) {
+  SheetBody(title = flow.title ?: "You need a pass to ride", subtitle = flow.message) {
+    Spacer(Modifier.height(4.dp))
+    ActionButtons(UiAction("Buy a pass", onClick = onBuy), UiAction("Not now", onClick = onClose))
   }
 }

@@ -2,13 +2,14 @@ package dev.davidv.londontransport
 
 import dev.davidv.londontransport.domain.AvailabilityLevel
 import dev.davidv.londontransport.domain.BikeCounts
+import dev.davidv.londontransport.domain.DetailRow
+import dev.davidv.londontransport.domain.Stat
 import dev.davidv.londontransport.domain.FeatureKey
 import dev.davidv.londontransport.domain.LatLon
 import dev.davidv.londontransport.domain.Station
 import dev.davidv.londontransport.domain.StationId
 import dev.davidv.londontransport.domain.StationState
 import dev.davidv.londontransport.domain.StationStatus
-import dev.davidv.londontransport.domain.TerminalName
 import dev.davidv.londontransport.layers.stationFeature
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -21,14 +22,12 @@ private fun station(
 ) =
   Station(
     id = StationId("BikePoints_1"),
-    terminal = TerminalName("001023"),
     name = "River Street, Clerkenwell",
     position = LatLon(51.5, -0.1),
     status =
       StationStatus.Live(
         bikes = BikeCounts(standard = standard, electric = electric),
         emptyDocks = emptyDocks,
-        capacity = 20,
         state = state,
       ),
   )
@@ -62,6 +61,14 @@ class CycleFeaturesTest {
   fun `summary counts electric bikes separately and pluralises`() {
     assertEquals("5 bikes (2 electric) · 5 free docks", stationFeature(station(3, 2)).summary)
     assertEquals("1 bike · 1 free dock", stationFeature(station(1, emptyDocks = 1)).summary)
+  }
+
+  @Test
+  fun `only a station in service shows counts and none repeat as detail rows`() {
+    val open = stationFeature(station(3, 2))
+    assertEquals(listOf(Stat("Bikes", 3), Stat("E-bikes", 2), Stat("Free docks", 5)), open.stats)
+    assertEquals(emptyList<DetailRow>(), open.details)
+    assertEquals(emptyList<Stat>(), stationFeature(station(standard = 12, state = StationState.LOCKED)).stats)
   }
 
   @Test

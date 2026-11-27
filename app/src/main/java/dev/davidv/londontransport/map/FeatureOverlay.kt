@@ -23,6 +23,8 @@ private const val STOPS_FROM_ZOOM = 13.5
 private const val MEDIUM_FROM_ZOOM = 13.0
 private const val PIN_COLOUR = 0xFF7B1FA2.toInt()
 
+enum class TileShade { Light, Dark }
+
 /**
  * Draws flat shapes in one pass instead of one [org.osmdroid.views.overlay.Marker] per point, which
  * does not survive the whole cycle hire network.
@@ -58,11 +60,20 @@ class FeatureOverlay(
     }
   private val pinLabel =
     Paint(Paint.ANTI_ALIAS_FLAG).apply {
-      color = Color.BLACK
       textAlign = Paint.Align.CENTER
       isFakeBoldText = true
       textSize = 12f * density
-      setShadowLayer(3f * density, 0f, 0f, Color.WHITE)
+    }
+
+  /** A solid outline rather than a soft shadow: a shadow disappears on the busy inverted tiles. */
+  private val pinHalo =
+    Paint(Paint.ANTI_ALIAS_FLAG).apply {
+      textAlign = Paint.Align.CENTER
+      isFakeBoldText = true
+      textSize = 12f * density
+      style = Paint.Style.STROKE
+      strokeWidth = 3.5f * density
+      strokeJoin = Paint.Join.ROUND
     }
   private val stopRing =
     Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
@@ -71,10 +82,12 @@ class FeatureOverlay(
 
   private class Placed(val feature: MapFeature, val point: GeoPoint)
 
-  fun show(features: List<MapFeature>, selected: FeatureKey?, favourites: Set<FeatureKey>) {
+  fun show(features: List<MapFeature>, selected: FeatureKey?, favourites: Set<FeatureKey>, shade: TileShade) {
     placed = features.map { Placed(it, GeoPoint(it.position.latitude, it.position.longitude)) }
     this.selected = selected
     this.favourites = favourites
+    pinLabel.color = if (shade == TileShade.Dark) Color.WHITE else Color.BLACK
+    pinHalo.color = if (shade == TileShade.Dark) Color.BLACK else Color.WHITE
   }
 
   override fun draw(canvas: Canvas, projection: Projection) {
@@ -166,6 +179,7 @@ class FeatureOverlay(
       canvas.drawCircle(x, centreY, head * 1.5f, highlight)
     }
     if (zoom >= MEDIUM_FROM_ZOOM) {
+      canvas.drawText(feature.title, x, y + 14f * density, pinHalo)
       canvas.drawText(feature.title, x, y + 14f * density, pinLabel)
     }
   }

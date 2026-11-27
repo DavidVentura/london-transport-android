@@ -105,6 +105,10 @@ dependencies {
   androidTestImplementation(composeBom)
 
   implementation(libs.androidx.core.ktx)
+  implementation(libs.androidx.biometric)
+  // biometric pulls fragment 1.2.5, whose FragmentActivity rejects the request codes that
+  // rememberLauncherForActivityResult uses, crashing the camera permission prompt.
+  implementation(libs.androidx.fragment)
   implementation(libs.androidx.lifecycle.runtime.ktx)
   implementation(libs.androidx.activity.compose)
 
@@ -121,6 +125,11 @@ dependencies {
   implementation(libs.kotlinx.serialization.json)
   implementation(libs.okhttp)
   implementation(libs.osmdroid.android)
+
+  implementation(libs.androidx.camera.camera2)
+  implementation(libs.androidx.camera.lifecycle)
+  implementation(libs.androidx.camera.view)
+  implementation(libs.zxing.cpp)
 
   testImplementation(libs.junit)
   testImplementation(libs.kotlinx.coroutines.test)

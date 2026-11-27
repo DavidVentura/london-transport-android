@@ -4,11 +4,11 @@ import android.util.Log
 import dev.davidv.londontransport.data.CacheRead
 import dev.davidv.londontransport.data.FeedResult
 import dev.davidv.londontransport.data.StationCache
-import dev.davidv.londontransport.data.TflBikePointClient
+import dev.davidv.londontransport.data.StationFeed
 import dev.davidv.londontransport.domain.LayerId
 import dev.davidv.londontransport.domain.MapFeature
 
-class CycleHireLayer(private val client: TflBikePointClient, private val cache: StationCache) :
+class CycleHireLayer(private val client: StationFeed, private val cache: StationCache) :
   MapLayer {
   override val id: LayerId = CYCLE_HIRE_LAYER
   override val title: String = "Santander Cycles"
@@ -25,8 +25,8 @@ class CycleHireLayer(private val client: TflBikePointClient, private val cache: 
 
   override suspend fun load(): LayerLoad =
     when (val result = client.fetch()) {
-      is FeedResult.Unreachable -> offline("Could not reach TfL: ${result.reason}")
-      is FeedResult.Unusable -> offline("TfL feed unreadable: ${result.reason}")
+      is FeedResult.Unreachable -> offline("Could not reach Santander Cycles: ${result.reason}")
+      is FeedResult.Unusable -> offline("Santander Cycles feed unreadable: ${result.reason}")
       is FeedResult.Success -> {
         if (result.feed.malformed.isNotEmpty()) {
           Log.w(TAG, "dropped ${result.feed.malformed.size} malformed docking stations")

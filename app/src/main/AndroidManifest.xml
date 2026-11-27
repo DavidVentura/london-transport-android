@@ -2,11 +2,14 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.CAMERA" />
 
     <uses-feature android:name="android.hardware.location.gps" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.any" android:required="false" />
 
     <!-- A broadcast has to name its target package to reach a manifest receiver, and
          naming one is only allowed for packages listed here. -->
@@ -26,11 +29,18 @@
         android:theme="@style/Theme.LondonTransport">
         <activity
             android:name=".MainActivity"
+            android:launchMode="singleTop"
             android:exported="true"
             android:label="@string/app_name">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="londontransport" android:host="hpp_purchase" />
             </intent-filter>
         </activity>
     </application>

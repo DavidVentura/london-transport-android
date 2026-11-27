@@ -4,7 +4,6 @@ import dev.davidv.londontransport.domain.LatLon
 import dev.davidv.londontransport.domain.Station
 import dev.davidv.londontransport.domain.StationId
 import dev.davidv.londontransport.domain.StationStatus
-import dev.davidv.londontransport.domain.TerminalName
 import java.io.File
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
@@ -16,7 +15,6 @@ import kotlinx.serialization.json.Json
 @Serializable
 private data class CachedStation(
   val id: String,
-  val terminal: String,
   val name: String,
   val lat: Double,
   val lon: Double,
@@ -42,7 +40,6 @@ class StationCache(private val file: File) {
           cached.map {
             Station(
               id = StationId(it.id),
-              terminal = TerminalName(it.terminal),
               name = it.name,
               position = LatLon(it.lat, it.lon),
               status = StationStatus.Unknown,
@@ -63,7 +60,6 @@ class StationCache(private val file: File) {
           stations.map {
             CachedStation(
               id = it.id.value,
-              terminal = it.terminal.value,
               name = it.name,
               lat = it.position.latitude,
               lon = it.position.longitude,

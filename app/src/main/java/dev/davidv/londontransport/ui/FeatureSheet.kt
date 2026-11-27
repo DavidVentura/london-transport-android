@@ -1,128 +1,76 @@
 package dev.davidv.londontransport.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.StarBorder
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import dev.davidv.londontransport.domain.HireTarget
 import dev.davidv.londontransport.domain.MapFeature
+import dev.davidv.londontransport.domain.Stat
 
+/** Bikes are hired by scanning one at the dock, so a station only shows what is there. */
 @Composable
-fun FeatureSheet(
-  feature: MapFeature,
-  favourite: Boolean,
-  onToggleFavourite: () -> Unit,
-  hire: HireState,
-  onRent: (HireTarget) -> Unit,
-) {
-  Column(modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, bottom = 32.dp)) {
+fun FeatureSheet(feature: MapFeature, favourite: Boolean, onToggleFavourite: () -> Unit) {
+  Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(start = 24.dp, end = 12.dp, bottom = 24.dp)) {
     Row(verticalAlignment = Alignment.CenterVertically) {
+      AvailabilityDot(feature, Modifier.size(12.dp))
       Text(
         feature.title,
         style = MaterialTheme.typography.headlineSmall,
-        modifier = Modifier.weight(1f),
+        modifier = Modifier.weight(1f).padding(start = 12.dp),
       )
       IconButton(onClick = onToggleFavourite) {
         Icon(
           if (favourite) Icons.Filled.Star else Icons.Outlined.StarBorder,
-          contentDescription =
-            if (favourite) "Remove from favourites" else "Add to favourites",
+          contentDescription = if (favourite) "Remove from favourites" else "Add to favourites",
           tint = MaterialTheme.colorScheme.primary,
         )
       }
     }
-    Text(
-      feature.summary,
-      style = MaterialTheme.typography.bodyLarge,
-      color = availabilityColour(feature.level),
-      modifier = Modifier.padding(top = 4.dp, bottom = 16.dp),
-    )
-
-    feature.details.forEach { detail ->
-      Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-      ) {
-        Text(
-          detail.label,
-          style = MaterialTheme.typography.bodyMedium,
-          color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(detail.value, style = MaterialTheme.typography.bodyMedium)
-      }
-      HorizontalDivider()
-    }
-
-    if (feature.hire != null) {
-      HireButton(
-        target = feature.hire,
-        loggedIn = hire.account != null,
-        busy = hire.releasing(feature.key),
-        onRent = onRent,
+    if (feature.stats.isEmpty()) {
+      Text(
+        feature.summary,
+        style = MaterialTheme.typography.bodyLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(top = 8.dp, end = 12.dp),
       )
-      if (hire.bought(feature.key)) {
-        Text(
-          "Access bought. Tap Rent bike to take one out.",
-          style = MaterialTheme.typography.bodyMedium,
-          color = MaterialTheme.colorScheme.primary,
-          modifier = Modifier.padding(top = 12.dp),
-        )
-      }
-      hire.failure(feature.key)?.let { message ->
-        Text(
-          message,
-          style = MaterialTheme.typography.bodyMedium,
-          color = MaterialTheme.colorScheme.error,
-          modifier = Modifier.padding(top = 12.dp),
-        )
+    } else {
+      Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 16.dp, end = 12.dp)) {
+        feature.stats.forEach { StatTile(it, Modifier.weight(1f)) }
       }
     }
   }
 }
 
-/** One tap releases a bike, so the label says which of the two things the tap is about to do. */
 @Composable
-private fun HireButton(
-  target: HireTarget,
-  loggedIn: Boolean,
-  busy: Boolean,
-  onRent: (HireTarget) -> Unit,
-) {
-  Button(
-    onClick = { onRent(target) },
-    enabled = !busy,
-    modifier = Modifier.fillMaxWidth().padding(top = 24.dp),
-  ) {
-    if (busy) {
-      CircularProgressIndicator(
-        strokeWidth = 2.dp,
-        color = MaterialTheme.colorScheme.onPrimary,
-        modifier = Modifier.size(16.dp),
-      )
+private fun StatTile(stat: Stat, modifier: Modifier) {
+  Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = MaterialTheme.shapes.medium, modifier = modifier) {
+    Column(Modifier.padding(horizontal = 12.dp, vertical = 12.dp)) {
+      Text(stat.value.toString(), style = MaterialTheme.typography.headlineMedium)
+      Text(stat.label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
-    Text(
-      when {
-        busy -> "Releasing a bike…"
-        loggedIn -> "Rent bike"
-        else -> "Log in to rent a bike"
-      },
-      modifier = Modifier.padding(start = if (busy) 12.dp else 0.dp),
-    )
   }
+}
+
+/** The availability colours are for marks only; on text they fail contrast on dark surfaces. */
+@Composable
+fun AvailabilityDot(feature: MapFeature, modifier: Modifier) {
+  Box(modifier.background(availabilityColour(feature.level), CircleShape))
 }
