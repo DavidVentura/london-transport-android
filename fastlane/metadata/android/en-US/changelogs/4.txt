@@ -1,0 +1,1 @@
+Rebuilt for the new Santander Cycles backend. Hire a bike by scanning its QR code, buy passes in the app through the secure checkout page, and see your account and ride history. Refreshed design with dark mode and Material You colours.
